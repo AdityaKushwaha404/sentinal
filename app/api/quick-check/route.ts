@@ -59,8 +59,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const payload = quickCheckSchema.parse(body);
 
+    let url = payload.url.trim();
+    if (["HTTP", "HTTPS", "JSON_API"].includes(payload.type) && !/^https?:\/\//i.test(url)) {
+      url = payload.type === "HTTPS" ? `https://${url}` : `http://${url}`;
+    }
+
     const {
-      url,
       type,
       httpMethod,
       httpHeaders,

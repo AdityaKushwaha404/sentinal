@@ -75,10 +75,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const payload = createMonitorSchema.parse(body);
 
+    let targetUrl = payload.url.trim();
+    if (["HTTP", "HTTPS", "JSON_API"].includes(payload.type) && !/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = payload.type === "HTTPS" ? `https://${targetUrl}` : `http://${targetUrl}`;
+    }
+
     const monitor = await MonitorService.create({
       userId: user.id,
       name: payload.name,
-      url: payload.url,
+      url: targetUrl,
       type: payload.type,
       monitorInterval: payload.monitorInterval,
       tags: payload.tags,
