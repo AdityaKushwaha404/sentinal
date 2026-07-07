@@ -9,6 +9,14 @@ export interface CreateMonitorInput {
   type: string;
   monitorInterval: number;
   tags?: string[];
+  // Type-specific config
+  httpMethod?: string;
+  httpHeaders?: Record<string, string>;
+  timeoutMs?: number;
+  expectedStatusCode?: number;
+  jsonPath?: string;
+  jsonPathExpected?: string;
+  tcpPort?: number;
 }
 
 export interface UpdateMonitorInput {
@@ -18,11 +26,25 @@ export interface UpdateMonitorInput {
   isActive?: boolean;
   status?: CheckStatus;
   tags?: string[];
+  // Type-specific config
+  httpMethod?: string;
+  httpHeaders?: Record<string, string>;
+  timeoutMs?: number;
+  expectedStatusCode?: number;
+  jsonPath?: string;
+  jsonPathExpected?: string;
+  tcpPort?: number;
 }
 
 export class MonitorService {
   static async create(input: CreateMonitorInput) {
-    const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Math.random().toString(36).substring(2, 7);
+    const slug =
+      input.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") +
+      "-" +
+      Math.random().toString(36).substring(2, 7);
 
     const monitor = await db.monitor.create({
       data: {
@@ -32,6 +54,14 @@ export class MonitorService {
         type: input.type,
         monitorInterval: input.monitorInterval,
         slug,
+        // Type-specific config
+        httpMethod: input.httpMethod ?? "GET",
+        httpHeaders: input.httpHeaders ?? undefined,
+        timeoutMs: input.timeoutMs ?? 8000,
+        expectedStatusCode: input.expectedStatusCode ?? undefined,
+        jsonPath: input.jsonPath ?? undefined,
+        jsonPathExpected: input.jsonPathExpected ?? undefined,
+        tcpPort: input.tcpPort ?? undefined,
         tags: input.tags
           ? {
               connectOrCreate: input.tags.map((tagName) => ({
@@ -46,7 +76,10 @@ export class MonitorService {
       },
     });
 
-    await AuditService.log(input.userId, "MONITOR_CREATE", { monitorId: monitor.id, name: monitor.name });
+    await AuditService.log(input.userId, "MONITOR_CREATE", {
+      monitorId: monitor.id,
+      name: monitor.name,
+    });
     return monitor;
   }
 
@@ -76,18 +109,28 @@ export class MonitorService {
   }
 
   static async update(id: string, userId: string, input: UpdateMonitorInput) {
-    // If updating tags, disconnect existing and re-connect new
     const updateData: Prisma.MonitorUpdateInput = {
       name: input.name,
       url: input.url,
       monitorInterval: input.monitorInterval,
       isActive: input.isActive,
       status: input.status,
+      // Type-specific config
+      httpMethod: input.httpMethod,
+      timeoutMs: input.timeoutMs,
+      expectedStatusCode: input.expectedStatusCode,
+      jsonPath: input.jsonPath,
+      jsonPathExpected: input.jsonPathExpected,
+      tcpPort: input.tcpPort,
     };
+
+    if (input.httpHeaders !== undefined) {
+      updateData.httpHeaders = input.httpHeaders;
+    }
 
     if (input.tags !== undefined) {
       updateData.tags = {
-        set: [], // Clear connections
+        set: [],
         connectOrCreate: input.tags.map((tagName) => ({
           where: { userId_name: { userId, name: tagName } },
           create: { userId, name: tagName },
@@ -103,7 +146,12 @@ export class MonitorService {
       },
     });
 
-    const action = input.isActive === false ? "MONITOR_PAUSE" : input.isActive === true ? "MONITOR_RESUME" : "MONITOR_UPDATE";
+    const action =
+      input.isActive === false
+        ? "MONITOR_PAUSE"
+        : input.isActive === true
+          ? "MONITOR_RESUME"
+          : "MONITOR_UPDATE";
     await AuditService.log(userId, action, { monitorId: monitor.id, changes: input });
     return monitor;
   }
@@ -113,7 +161,10 @@ export class MonitorService {
       where: { id, userId },
     });
 
-    await AuditService.log(userId, "MONITOR_DELETE", { monitorId: id, name: monitor.name });
+    await AuditService.log(userId, "MONITOR_DELETE", {
+      monitorId: id,
+      name: monitor.name,
+    });
     return monitor;
   }
 }

@@ -3,20 +3,21 @@
 import React, { useState } from "react";
 
 
-import { Plus, Search, Loader2, Play, Pause, Trash2, Edit, ExternalLink, Activity, ShieldAlert, Wifi, Database, Cpu } from "lucide-react";
+import { Plus, Search, Loader2, Play, Pause, Trash2, Edit, ExternalLink, Activity, ShieldAlert, Wifi, Database, Cpu, Globe, Shield } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 
-import { useDashboardMetrics, useMonitors, useCreateMonitor, useUpdateMonitor, useDeleteMonitor } from "@/hooks/use-monitors";
+import { useDashboardMetrics, useMonitors, useUpdateMonitor, useDeleteMonitor } from "@/hooks/use-monitors";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { MonitorWizard } from "@/components/monitors/monitor-wizard";
 
 interface Tag {
   id: string;
@@ -28,7 +29,7 @@ interface Monitor {
   id: string;
   name: string;
   url: string;
-  type: "HTTP" | "PING" | "TCP" | "SSL";
+  type: "HTTP" | "HTTPS" | "TCP" | "SSL" | "PING" | "JSON_API";
   monitorInterval: number;
   isActive: boolean;
   status: "HEALTHY" | "WARNING" | "DOWN";
@@ -41,8 +42,7 @@ interface Monitor {
 // Form Zod schemas
 const monitorSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  url: z.string().url("Must be a valid URL (include http/https)"),
-  type: z.enum(["HTTP", "PING", "TCP", "SSL"]),
+  url: z.string().min(1, "Target is required"),
   monitorInterval: z.number().int().min(1, "Interval must be at least 1 minute"),
   tagsInput: z.string().optional(),
 });
@@ -61,45 +61,12 @@ export default function DashboardPage() {
   // React Query hooks
   const { data: metrics } = useDashboardMetrics();
   const { data: monitors, isLoading: isMonitorsLoading } = useMonitors();
-  const createMonitor = useCreateMonitor();
   const updateMonitor = useUpdateMonitor(selectedMonitor?.id || "");
   const deleteMonitor = useDeleteMonitor();
-
-  // Form setups
-  const addForm = useForm<MonitorFormValues>({
-    resolver: zodResolver(monitorSchema),
-    defaultValues: {
-      name: "",
-      url: "",
-      type: "HTTP",
-      monitorInterval: 5,
-      tagsInput: "",
-    },
-  });
 
   const editForm = useForm<MonitorFormValues>({
     resolver: zodResolver(monitorSchema),
   });
-
-  // Action Handlers
-  const onAddSubmit = (values: MonitorFormValues) => {
-    const tags = values.tagsInput ? values.tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
-    createMonitor.mutate(
-      {
-        name: values.name,
-        url: values.url,
-        type: values.type,
-        monitorInterval: values.monitorInterval,
-        tags,
-      },
-      {
-        onSuccess: () => {
-          setIsAddOpen(false);
-          addForm.reset();
-        },
-      }
-    );
-  };
 
   const onEditSubmit = (values: MonitorFormValues) => {
     const tags = values.tagsInput ? values.tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
@@ -124,7 +91,6 @@ export default function DashboardPage() {
     editForm.reset({
       name: monitor.name,
       url: monitor.url,
-      type: monitor.type,
       monitorInterval: monitor.monitorInterval,
       tagsInput: monitor.tags?.map((t: Tag) => t.name).join(", ") || "",
     });
@@ -166,6 +132,23 @@ export default function DashboardPage() {
     return matchesSearch && matchesTag;
   });
 
+  const getMonitorIcon = (type: Monitor["type"]) => {
+    switch (type) {
+      case "HTTP":
+      case "JSON_API":
+        return <Globe className="h-4 w-4 text-emerald-500" />;
+      case "HTTPS":
+      case "SSL":
+        return <Shield className="h-4 w-4 text-emerald-500" />;
+      case "TCP":
+        return <Activity className="h-4 w-4 text-emerald-500" />;
+      case "PING":
+        return <Cpu className="h-4 w-4 text-emerald-500" />;
+      default:
+        return <Globe className="h-4 w-4 text-emerald-500" />;
+    }
+  };
+
 
   return (
     <div className="space-y-8 font-sans selection:bg-accent">
@@ -181,70 +164,15 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all shadow-sm self-start sm:self-center font-sans">
-            <Plus className="h-4 w-4" />
-            Add Monitor Target
-          </DialogTrigger>
-          <DialogContent className="bg-card border border-border text-card-foreground rounded-2xl p-6">
-            <DialogHeader>
-              <DialogTitle className="text-md font-bold tracking-tight text-foreground">Add Monitor Target</DialogTitle>
-              <DialogDescription className="text-muted-foreground text-xs mt-0.5">
-                Register a public endpoint to check performance, availability, and SSL status.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
-              <div className="space-y-1">
-                <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground">Friendly Name</Label>
-                <Input id="name" {...addForm.register("name")} className="bg-background border-border text-foreground rounded-xl" placeholder="Production API Gateway" />
-                {addForm.formState.errors.name && <p className="text-xs text-destructive mt-1">{addForm.formState.errors.name.message}</p>}
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="url" className="text-xs font-semibold text-muted-foreground">Target URL</Label>
-                <Input id="url" {...addForm.register("url")} className="bg-background border-border text-foreground rounded-xl" placeholder="https://api.myproject.com/health" />
-                {addForm.formState.errors.url && <p className="text-xs text-destructive mt-1">{addForm.formState.errors.url.message}</p>}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="type" className="text-xs font-semibold text-muted-foreground">Probe Type</Label>
-                  <Select onValueChange={(v) => addForm.setValue("type", (v || "HTTP") as "HTTP" | "PING" | "TCP" | "SSL")} defaultValue="HTTP">
-                    <SelectTrigger className="bg-background border-border text-foreground rounded-xl">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border text-card-foreground rounded-xl">
-                      <SelectItem value="HTTP">HTTP/HTTPS</SelectItem>
-                      <SelectItem value="SSL">SSL Cert Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="monitorInterval" className="text-xs font-semibold text-muted-foreground">Check Interval</Label>
-                  <Select onValueChange={(v) => addForm.setValue("monitorInterval", parseInt(v || "5", 10))} defaultValue="5">
-                    <SelectTrigger className="bg-background border-border text-foreground rounded-xl">
-                      <SelectValue placeholder="Select interval" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border text-card-foreground rounded-xl">
-                      <SelectItem value="1">1 minute</SelectItem>
-                      <SelectItem value="5">5 minutes</SelectItem>
-                      <SelectItem value="15">15 minutes</SelectItem>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="tagsInput" className="text-xs font-semibold text-muted-foreground">Tags (Comma-separated)</Label>
-                <Input id="tagsInput" {...addForm.register("tagsInput")} className="bg-background border-border text-foreground rounded-xl" placeholder="Production, Client-A" />
-              </div>
-              <DialogFooter className="mt-6">
-                <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all">
-                  {createMonitor.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Create Monitor
-                </button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <button 
+          onClick={() => setIsAddOpen(true)}
+          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all shadow-sm self-start sm:self-center font-sans border-0"
+        >
+          <Plus className="h-4 w-4" />
+          Add Monitor Target
+        </button>
+
+        <MonitorWizard isOpen={isAddOpen} onOpenChange={setIsAddOpen} />
       </div>
 
       {/* Conditional Alert Banner */}
@@ -374,6 +302,7 @@ export default function DashboardPage() {
                 <TableHeader className="border-b border-border">
                   <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-muted-foreground text-xs font-semibold uppercase tracking-wider pl-6">Name</TableHead>
+                    <TableHead className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Type</TableHead>
                     <TableHead className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Status</TableHead>
                     <TableHead className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Interval</TableHead>
                     <TableHead className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Tags</TableHead>
@@ -391,6 +320,12 @@ export default function DashboardPage() {
                           </Link>
                           <span className="text-xs text-muted-foreground max-w-[280px] truncate">{monitor.url}</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="flex items-center gap-1.5 w-fit bg-muted text-muted-foreground border border-border/80 text-[10px] rounded-md font-bold px-2 py-0.5 uppercase tracking-wide">
+                          {getMonitorIcon(monitor.type)}
+                          <span>{monitor.type}</span>
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -494,7 +429,7 @@ export default function DashboardPage() {
               <Input id="edit-tagsInput" {...editForm.register("tagsInput")} className="bg-background border-border text-foreground rounded-xl" />
             </div>
             <DialogFooter className="mt-6">
-              <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all">
+              <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all border-0">
                 {updateMonitor.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save Changes
               </button>
@@ -516,7 +451,7 @@ export default function DashboardPage() {
             <button onClick={() => setIsDeleteOpen(false)} className="rounded-xl border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted cursor-pointer">
               Cancel
             </button>
-            <button onClick={handleDeleteConfirm} className="flex items-center gap-2 rounded-xl bg-destructive px-4 py-2 text-xs font-bold text-destructive-foreground hover:bg-destructive/90 cursor-pointer transition-all">
+            <button onClick={handleDeleteConfirm} className="flex items-center gap-2 rounded-xl bg-destructive px-4 py-2 text-xs font-bold text-destructive-foreground hover:bg-destructive/90 cursor-pointer transition-all border-0">
               {deleteMonitor.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Delete Permanently
             </button>

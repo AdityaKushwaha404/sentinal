@@ -54,8 +54,8 @@ model Monitor {
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   name            String
-  url             String          // Target URL or IP
-  type            String          @default("HTTP") // HTTP, PING, TCP, SSL
+  url             String          // Target URL, IP, or host:port
+  type            String          @default("HTTP") // HTTP, HTTPS, TCP, SSL, PING, JSON_API
   monitorInterval Int             @default(5) // In minutes (e.g. 1, 5, 15, 30)
   isActive        Boolean         @default(true)
   status          CheckStatus     @default(HEALTHY)
@@ -64,6 +64,15 @@ model Monitor {
   lastOnlineAt    DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+
+  // Type-specific config
+  httpMethod         String?  @default("GET") // HTTP/HTTPS/JSON_API
+  httpHeaders        Json?                    // HTTP/HTTPS/JSON_API: custom headers map
+  timeoutMs          Int?     @default(8000)  // All types: timeout in ms
+  expectedStatusCode Int?                     // HTTP/HTTPS/JSON_API: expected status code
+  jsonPath           String?                  // JSON_API: dot-notation path to assert
+  jsonPathExpected   String?                  // JSON_API: expected value at jsonPath
+  tcpPort            Int?                     // TCP/PING: port number
   
   // Relations
   checks          MonitorCheck[]
@@ -140,9 +149,14 @@ model Notification {
   monitorId String
   monitor   Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
   type      NotificationType
+  title     String           @default("")
+  message   String           @default("")
   sentTo    String
+  isRead    Boolean          @default(false)
   sentAt    DateTime         @default(now())
 
   @@index([userId])
   @@index([monitorId])
+  @@index([userId, isRead])
 }
+

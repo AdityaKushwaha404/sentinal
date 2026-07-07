@@ -1,5 +1,5 @@
 import { db } from "@/lib/prisma";
-import { checkHttp, checkTcp, checkSsl, getHostname } from "@/utils/ping";
+import { checkHttp, checkTcp, checkSsl, checkJsonApi, checkPing, getHostname } from "@/utils/ping";
 import { EmailService } from "./emails";
 import { logger } from "@/lib/logger";
 import { Prisma } from "@prisma/client";
@@ -34,7 +34,6 @@ export class SchedulerService {
 
       logger.info(`Found ${activeMonitors.length} active monitors to check.`);
 
-      // Execute in parallel or sequentially depending on density. Let's do parallel processing with Promise.allSettled
       await Promise.allSettled(
         activeMonitors.map(async (monitor) => {
           try {
@@ -64,30 +63,63 @@ export class SchedulerService {
     let statusCode: number | null = null;
     let errorMessage: string | null = null;
 
-    const isHttps = monitor.url.startsWith("https://");
+    const monitorType = monitor.type || "HTTP";
+    const timeoutMs = monitor.timeoutMs ?? 8000;
 
-    // 1. Perform Uptime ping based on type
-    if (monitor.type === "TCP") {
+    // Parse headers stored as JSON
+    let parsedHeaders: Record<string, string> = {};
+    if (monitor.httpHeaders && typeof monitor.httpHeaders === "object" && !Array.isArray(monitor.httpHeaders)) {
+      parsedHeaders = monitor.httpHeaders as Record<string, string>;
+    }
+
+    // 1. Perform check based on type
+    if (monitorType === "TCP") {
       const hostname = getHostname(monitor.url);
-      const portStr = monitor.url.split(":")[2] || "80";
-      const port = parseInt(portStr, 10);
-      const res = await checkTcp(hostname, port);
+      const port = monitor.tcpPort ?? parseInt(monitor.url.split(":").pop() ?? "80", 10);
+      const res = await checkTcp(hostname, isNaN(port) ? 80 : port, timeoutMs);
+      isAvailable = res.isAvailable;
+      responseTime = res.responseTime;
+      statusCode = res.statusCode;
+      errorMessage = res.errorMessage;
+    } else if (monitorType === "PING") {
+      const hostname = getHostname(monitor.url);
+      const port = monitor.tcpPort ?? 80;
+      const res = await checkPing(hostname, port, timeoutMs);
+      isAvailable = res.isAvailable;
+      responseTime = res.responseTime;
+      statusCode = res.statusCode;
+      errorMessage = res.errorMessage;
+    } else if (monitorType === "JSON_API") {
+      const res = await checkJsonApi(monitor.url, {
+        method: monitor.httpMethod ?? "GET",
+        headers: parsedHeaders,
+        timeoutMs,
+        expectedStatusCode: monitor.expectedStatusCode ?? 200,
+        jsonPath: monitor.jsonPath ?? undefined,
+        jsonPathExpected: monitor.jsonPathExpected ?? undefined,
+      });
       isAvailable = res.isAvailable;
       responseTime = res.responseTime;
       statusCode = res.statusCode;
       errorMessage = res.errorMessage;
     } else {
-      // Default: HTTP/HTTPS
-      const res = await checkHttp(monitor.url);
+      // HTTP, HTTPS, SSL — all go through checkHttp
+      const res = await checkHttp(monitor.url, {
+        method: monitor.httpMethod ?? "GET",
+        headers: parsedHeaders,
+        timeoutMs,
+        expectedStatusCode: monitor.expectedStatusCode ?? undefined,
+      });
       isAvailable = res.isAvailable;
       responseTime = res.responseTime;
       statusCode = res.statusCode;
       errorMessage = res.errorMessage;
     }
 
-    // 2. SSL certificate check if https is active
+    // 2. SSL certificate check for HTTPS and SSL types
     let sslCertInfo = null;
-    if (isHttps) {
+    const isHttps = monitor.url.startsWith("https://");
+    if (isHttps || monitorType === "SSL") {
       const hostname = getHostname(monitor.url);
       sslCertInfo = await checkSsl(hostname);
     }
@@ -105,8 +137,7 @@ export class SchedulerService {
 
     const previousStatus = monitor.status;
 
-    // 4. Update DB using sequential non-blocking updates
-    // Create Check record
+    // 4. Persist MonitorCheck record
     await db.monitorCheck.create({
       data: {
         monitorId: monitor.id,
@@ -118,7 +149,7 @@ export class SchedulerService {
       },
     });
 
-    // Update Monitor status and stamps
+    // Update Monitor status and timestamps
     await db.monitor.update({
       where: { id: monitor.id },
       data: {
@@ -130,7 +161,8 @@ export class SchedulerService {
 
     // Write/Update SSL Cert details if applicable
     if (sslCertInfo) {
-      const certStatusMapping = sslCertInfo.status === "EXPIRING" ? "EXPIRING_SOON" : sslCertInfo.status;
+      const certStatusMapping =
+        sslCertInfo.status === "EXPIRING" ? "EXPIRING_SOON" : sslCertInfo.status;
       await db.sSLCertificate.upsert({
         where: { monitorId: monitor.id },
         create: {
@@ -149,10 +181,11 @@ export class SchedulerService {
 
     // 5. Automatic Incident Management
     if (previousStatus === "HEALTHY" && finalStatus === "DOWN") {
-      // Site went down! Create open incident
       const title = `Downtime Incident: ${monitor.name} is Offline`;
-      const description = errorMessage || "The monitor returned an offline status or connection parameters failed.";
-      
+      const description =
+        errorMessage ||
+        "The monitor returned an offline status or connection parameters failed.";
+
       const openIncident = await db.incident.findFirst({
         where: { monitorId: monitor.id, status: "OPEN" },
       });
@@ -168,14 +201,25 @@ export class SchedulerService {
           },
         });
 
-        // Trigger alert email to the user
-        const userEmail = monitor.user?.email || monitor.user?.id; // fallback to ID/username/saved email
+        const userEmail = monitor.user?.email || monitor.user?.id;
         if (userEmail && monitor.user?.settings?.emailNotifications) {
           await EmailService.sendAlert(userEmail, monitor.name, monitor.url, description);
         }
+
+        // Create in-app notification
+        await db.notification.create({
+          data: {
+            userId: monitor.userId,
+            monitorId: monitor.id,
+            type: "DOWNTIME_ALERT",
+            title: `🔴 ${monitor.name} is down`,
+            message: description,
+            sentTo: monitor.user?.email ?? "",
+            isRead: false,
+          },
+        });
       }
     } else if (previousStatus === "DOWN" && finalStatus === "HEALTHY") {
-      // Site recovered! Find any open incidents and resolve
       const openIncident = await db.incident.findFirst({
         where: { monitorId: monitor.id, status: "OPEN" },
         orderBy: { startedAt: "desc" },
@@ -185,34 +229,46 @@ export class SchedulerService {
         const resolvedAt = new Date();
         await db.incident.update({
           where: { id: openIncident.id },
-          data: {
-            status: "RESOLVED",
-            resolvedAt,
-          },
+          data: { status: "RESOLVED", resolvedAt },
         });
 
-        // Calculate downtime duration
         const diffMs = resolvedAt.getTime() - new Date(openIncident.startedAt).getTime();
         const diffMins = Math.round(diffMs / 60000);
-        const durationStr = diffMins > 0 ? `${diffMins} minutes` : `${Math.round(diffMs / 1000)} seconds`;
+        const durationStr =
+          diffMins > 0 ? `${diffMins} minutes` : `${Math.round(diffMs / 1000)} seconds`;
 
-        // Trigger recovery email
         const userEmail = monitor.user?.email || monitor.user?.id;
         if (userEmail && monitor.user?.settings?.emailNotifications) {
           await EmailService.sendRecovery(userEmail, monitor.name, monitor.url, durationStr);
         }
+
+        // Create in-app notification
+        await db.notification.create({
+          data: {
+            userId: monitor.userId,
+            monitorId: monitor.id,
+            type: "UPTIME_RECOVERY",
+            title: `✅ ${monitor.name} recovered`,
+            message: `Monitor is back online after ${durationStr} of downtime.`,
+            sentTo: monitor.user?.email ?? "",
+            isRead: false,
+          },
+        });
       }
     }
 
-    // 6. Handle SSL certificate warnings
-    if (sslCertInfo && sslCertInfo.status === "EXPIRING" && monitor.user?.settings?.emailNotifications) {
-      // Look for a recent notification record in last 7 days to avoid spamming
+    // 6. SSL certificate warnings
+    if (
+      sslCertInfo &&
+      sslCertInfo.status === "EXPIRING" &&
+      monitor.user?.settings?.emailNotifications
+    ) {
       const lastWarning = await db.notification.findFirst({
         where: {
           monitorId: monitor.id,
           type: "SSL_EXPIRING_WARNING",
           sentAt: {
-            gt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days
+            gt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
           },
         },
       });
@@ -220,15 +276,23 @@ export class SchedulerService {
       if (!lastWarning) {
         const userEmail = monitor.user?.email || monitor.user?.id;
         if (userEmail) {
-          await EmailService.sendSSLExpiring(userEmail, monitor.name, monitor.url, sslCertInfo.remainingDays, sslCertInfo.expiryDate);
-          
-          // Log dispatched alert
+          await EmailService.sendSSLExpiring(
+            userEmail,
+            monitor.name,
+            monitor.url,
+            sslCertInfo.remainingDays,
+            sslCertInfo.expiryDate
+          );
+
           await db.notification.create({
             data: {
               userId: monitor.userId,
               monitorId: monitor.id,
               type: "SSL_EXPIRING_WARNING",
+              title: `⚠️ SSL expiring: ${monitor.name}`,
+              message: `SSL certificate expires in ${sslCertInfo.remainingDays} day(s).`,
               sentTo: userEmail,
+              isRead: false,
             },
           });
         }

@@ -27,31 +27,56 @@ export function getHostname(urlStr: string): string {
 }
 
 // HTTP/HTTPS Availability check
-export async function checkHttp(url: string, timeoutMs: number = 8000): Promise<CheckResult> {
+export async function checkHttp(
+  url: string,
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+    followRedirects?: boolean;
+    expectedStatusCode?: number;
+  } = {}
+): Promise<CheckResult> {
+  const {
+    method = "GET",
+    headers = {},
+    timeoutMs = 8000,
+    expectedStatusCode,
+  } = options;
+
   const startTime = Date.now();
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(url, {
-      method: "GET",
+      method,
       headers: {
-        "User-Agent": "SentinelMonitor/1.0",
+        "User-Agent": "SentinelMonitor/2.0",
+        ...headers,
       },
       signal: controller.signal,
       cache: "no-store",
+      redirect: "follow",
     });
 
     clearTimeout(timeout);
     const responseTime = Date.now() - startTime;
-    const isAvailable = response.status >= 200 && response.status < 400;
 
-    return {
-      statusCode: response.status,
-      responseTime,
-      isAvailable,
-      errorMessage: isAvailable ? null : `HTTP status: ${response.status}`,
-    };
+    let isAvailable: boolean;
+    let errorMessage: string | null = null;
+
+    if (expectedStatusCode !== undefined && expectedStatusCode !== null) {
+      isAvailable = response.status === expectedStatusCode;
+      errorMessage = isAvailable
+        ? null
+        : `Expected status ${expectedStatusCode}, got ${response.status}`;
+    } else {
+      isAvailable = response.status >= 200 && response.status < 400;
+      errorMessage = isAvailable ? null : `HTTP status: ${response.status}`;
+    }
+
+    return { statusCode: response.status, responseTime, isAvailable, errorMessage };
   } catch (error) {
     const responseTime = Date.now() - startTime;
     const isAbort = error instanceof Error && error.name === "AbortError";
@@ -65,8 +90,124 @@ export async function checkHttp(url: string, timeoutMs: number = 8000): Promise<
   }
 }
 
+// JSON API check — fetch + validate status code + optional JSON path assertion
+export async function checkJsonApi(
+  url: string,
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+    expectedStatusCode?: number;
+    jsonPath?: string;
+    jsonPathExpected?: string;
+  } = {}
+): Promise<CheckResult> {
+  const {
+    method = "GET",
+    headers = {},
+    timeoutMs = 8000,
+    expectedStatusCode = 200,
+    jsonPath,
+    jsonPathExpected,
+  } = options;
+
+  const startTime = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "User-Agent": "SentinelMonitor/2.0",
+        "Accept": "application/json",
+        ...headers,
+      },
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    clearTimeout(timeout);
+    const responseTime = Date.now() - startTime;
+
+    // Status code check
+    const statusMatch = response.status === expectedStatusCode;
+    if (!statusMatch) {
+      return {
+        statusCode: response.status,
+        responseTime,
+        isAvailable: false,
+        errorMessage: `Expected status ${expectedStatusCode}, got ${response.status}`,
+      };
+    }
+
+    // JSON path assertion
+    if (jsonPath) {
+      try {
+        const body = await response.json();
+        const actualValue = getNestedValue(body, jsonPath);
+        const actualStr = actualValue !== undefined ? String(actualValue) : undefined;
+
+        if (jsonPathExpected !== undefined && jsonPathExpected !== "") {
+          if (actualStr !== jsonPathExpected) {
+            return {
+              statusCode: response.status,
+              responseTime,
+              isAvailable: false,
+              errorMessage: `JSON path "${jsonPath}": expected "${jsonPathExpected}", got "${actualStr}"`,
+            };
+          }
+        } else if (actualValue === undefined || actualValue === null) {
+          return {
+            statusCode: response.status,
+            responseTime,
+            isAvailable: false,
+            errorMessage: `JSON path "${jsonPath}" not found in response`,
+          };
+        }
+      } catch {
+        return {
+          statusCode: response.status,
+          responseTime,
+          isAvailable: false,
+          errorMessage: "Response is not valid JSON",
+        };
+      }
+    }
+
+    return { statusCode: response.status, responseTime, isAvailable: true, errorMessage: null };
+  } catch (error) {
+    const responseTime = Date.now() - startTime;
+    const isAbort = error instanceof Error && error.name === "AbortError";
+    const message = error instanceof Error ? error.message : "Network Error";
+    return {
+      statusCode: null,
+      responseTime,
+      isAvailable: false,
+      errorMessage: isAbort ? "Timeout" : message,
+    };
+  }
+}
+
+// Helper: traverse dot-notation path in an object (e.g. "data.status")
+function getNestedValue(obj: unknown, path: string): unknown {
+  const keys = path.split(".");
+  let current: unknown = obj;
+  for (const key of keys) {
+    if (current === null || current === undefined || typeof current !== "object") {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+}
+
 // TCP Port check
-export function checkTcp(host: string, port: number = 80, timeoutMs: number = 5000): Promise<CheckResult> {
+export function checkTcp(
+  host: string,
+  port: number = 80,
+  timeoutMs: number = 5000
+): Promise<CheckResult> {
   return new Promise((resolve) => {
     const startTime = Date.now();
     const socket = new net.Socket();
@@ -110,8 +251,28 @@ export function checkTcp(host: string, port: number = 80, timeoutMs: number = 50
   });
 }
 
+// Ping check — ICMP not available without root; uses TCP socket as documented fallback
+// Attempts to connect to the specified port (default 80) to confirm host reachability
+export async function checkPing(
+  host: string,
+  port: number = 80,
+  timeoutMs: number = 5000
+): Promise<CheckResult> {
+  const result = await checkTcp(host, port, timeoutMs);
+  return {
+    ...result,
+    errorMessage: result.errorMessage
+      ? `Host unreachable (TCP fallback on port ${port}): ${result.errorMessage}`
+      : null,
+  };
+}
+
 // TLS Certificate Retrieval
-export function checkSsl(hostname: string, port: number = 443, timeoutMs: number = 5000): Promise<SSLCertInfo | null> {
+export function checkSsl(
+  hostname: string,
+  port: number = 443,
+  timeoutMs: number = 5000
+): Promise<SSLCertInfo | null> {
   return new Promise((resolve) => {
     try {
       const socket = tls.connect(
@@ -131,7 +292,10 @@ export function checkSsl(hostname: string, port: number = 443, timeoutMs: number
 
           const expiryDate = new Date(cert.valid_to);
           const now = new Date();
-          const remainingDays = Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+          const remainingDays = Math.max(
+            0,
+            Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          );
 
           let status: "VALID" | "EXPIRING" | "EXPIRED" = "VALID";
           if (remainingDays <= 0) {
@@ -140,8 +304,12 @@ export function checkSsl(hostname: string, port: number = 443, timeoutMs: number
             status = "EXPIRING";
           }
 
-          const issuerCn = Array.isArray(cert.issuer.CN) ? cert.issuer.CN[0] : cert.issuer.CN;
-          const issuerO = Array.isArray(cert.issuer.O) ? cert.issuer.O[0] : cert.issuer.O;
+          const issuerCn = Array.isArray(cert.issuer.CN)
+            ? cert.issuer.CN[0]
+            : cert.issuer.CN;
+          const issuerO = Array.isArray(cert.issuer.O)
+            ? cert.issuer.O[0]
+            : cert.issuer.O;
 
           resolve({
             issuer: issuerCn || issuerO || "Unknown Issuer",

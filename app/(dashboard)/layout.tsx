@@ -1,8 +1,9 @@
 import React from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Activity, LayoutDashboard, Settings, FileText } from "lucide-react";
+import { Activity, LayoutDashboard, Settings, FileText, Zap } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationCenter } from "@/components/notifications/notification-center";
 
 export default function DashboardLayout({
   children,
@@ -28,6 +29,13 @@ export default function DashboardLayout({
                 <LayoutDashboard className="h-3.5 w-3.5 text-emerald-500" />
                 Monitors
               </Link>
+              <Link
+                href="/dashboard/quick-check"
+                className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-accent transition-all uppercase tracking-wider"
+              >
+                <Zap className="h-3.5 w-3.5 text-amber-500" />
+                Quick Check
+              </Link>
               <button
                 className="hidden md:flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold text-muted-foreground cursor-not-allowed opacity-50 uppercase tracking-wider"
                 disabled
@@ -46,6 +54,7 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <NotificationCenter />
             <ThemeToggle />
             <UserButton />
           </div>

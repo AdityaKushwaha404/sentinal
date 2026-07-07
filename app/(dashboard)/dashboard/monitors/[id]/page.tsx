@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Clock, ShieldCheck, AlertTriangle, FileText, BarChart3, Settings as SettingsIcon, Loader2, Activity, Globe, ExternalLink, Trash2, Play, Pause, Calendar, Award, Hourglass, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Clock, ShieldCheck, AlertTriangle, FileText, BarChart3, Settings as SettingsIcon, Loader2, Activity, Globe, ExternalLink, Trash2, Play, Pause, Calendar, Award, Hourglass, ShieldAlert, Cpu, Zap } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HealthScoreRing } from "@/components/monitors/health-score-ring";
+import { UptimeCalendar } from "@/components/monitors/uptime-calendar";
 
 interface MonitorCheck {
   id: string;
@@ -40,7 +42,7 @@ interface Incident {
 
 const settingsSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  url: z.string().url("Must be a valid URL"),
+  url: z.string().min(1, "Target is required"),
   monitorInterval: z.number().int().min(1),
 });
 

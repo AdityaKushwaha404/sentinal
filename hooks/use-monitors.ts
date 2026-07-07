@@ -3,9 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 interface CreateMonitorPayload {
   name: string;
   url: string;
-  type: "HTTP" | "PING" | "TCP" | "SSL";
+  type: "HTTP" | "HTTPS" | "TCP" | "SSL" | "PING" | "JSON_API";
   monitorInterval: number;
   tags?: string[];
+  httpMethod?: "GET" | "POST" | "PUT" | "HEAD" | "OPTIONS";
+  httpHeaders?: Record<string, string>;
+  timeoutMs?: number;
+  expectedStatusCode?: number;
+  jsonPath?: string;
+  jsonPathExpected?: string;
+  tcpPort?: number;
 }
 
 interface UpdateMonitorPayload {
@@ -14,6 +21,13 @@ interface UpdateMonitorPayload {
   monitorInterval?: number;
   isActive?: boolean;
   tags?: string[];
+  httpMethod?: "GET" | "POST" | "PUT" | "HEAD" | "OPTIONS";
+  httpHeaders?: Record<string, string>;
+  timeoutMs?: number;
+  expectedStatusCode?: number;
+  jsonPath?: string;
+  jsonPathExpected?: string;
+  tcpPort?: number;
 }
 
 export function useDashboardMetrics() {
