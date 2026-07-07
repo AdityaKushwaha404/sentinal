@@ -130,12 +130,7 @@ export async function POST(req: Request) {
       startedAt,
       ...result,
       ssl: sslInfo
-        ? {
-            issuer: sslInfo.issuer,
-            expiryDate: sslInfo.expiryDate,
-            remainingDays: sslInfo.remainingDays,
-            status: sslInfo.status,
-          }
+        ? `${sslInfo.status} — ${sslInfo.remainingDays} days remaining (Issuer: ${sslInfo.issuer || "Unknown"})`
         : null,
     });
   } catch (error) {
