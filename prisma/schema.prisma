@@ -1,0 +1,148 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum CheckStatus {
+  HEALTHY
+  WARNING
+  DOWN
+}
+
+enum IncidentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum NotificationType {
+  DOWNTIME_ALERT
+  UPTIME_RECOVERY
+  SSL_EXPIRING_WARNING
+}
+
+model User {
+  id            String         @id // Matches Clerk User ID
+  email         String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  // Relations
+  settings      UserSettings?
+  monitors      Monitor[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([email])
+}
+
+model UserSettings {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timezone           String   @default("UTC")
+  emailNotifications Boolean  @default(true)
+  theme              String   @default("dark")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Monitor {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  url             String          // Target URL or IP
+  type            String          @default("HTTP") // HTTP, PING, TCP, SSL
+  monitorInterval Int             @default(5) // In minutes (e.g. 1, 5, 15, 30)
+  isActive        Boolean         @default(true)
+  status          CheckStatus     @default(HEALTHY)
+  slug            String          @unique // For public status page `/status/[slug]`
+  lastCheckedAt   DateTime?
+  lastOnlineAt    DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relations
+  checks          MonitorCheck[]
+  sslCertificate  SSLCertificate?
+  incidents       Incident[]
+  notifications   Notification[]
+  tags            Tag[]           @relation("MonitorTags")
+
+  @@index([userId])
+  @@index([slug])
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String
+  userId    String
+  monitors  Monitor[] @relation("MonitorTags")
+
+  @@unique([userId, name])
+}
+
+model MonitorCheck {
+  id           String   @id @default(uuid())
+  monitorId    String
+  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  statusCode   Int?
+  responseTime Int      @default(0) // Milliseconds
+  isAvailable  Boolean
+  errorMessage String?
+  checkedAt    DateTime @default(now())
+
+  @@index([monitorId, checkedAt])
+}
+
+model SSLCertificate {
+  id         String   @id @default(uuid())
+  monitorId  String   @unique
+  monitor    Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  issuer     String
+  expiryDate DateTime
+  status     String   // e.g. "VALID", "EXPIRING_SOON", "EXPIRED", "INVALID"
+  updatedAt  DateTime @updatedAt
+}
+
+model Incident {
+  id          String         @id @default(uuid())
+  monitorId   String
+  monitor     Monitor        @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status      IncidentStatus @default(OPEN)
+  title       String
+  description String?
+  startedAt   DateTime       @default(now())
+  resolvedAt  DateTime?
+
+  @@index([monitorId, startedAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // e.g. "MONITOR_CREATE", "MONITOR_DELETE", "SETTINGS_UPDATE", "MONITOR_PAUSE"
+  metadata  Json?    // Detailed parameters
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitorId String
+  monitor   Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  sentTo    String
+  sentAt    DateTime         @default(now())
+
+  @@index([userId])
+  @@index([monitorId])
+}

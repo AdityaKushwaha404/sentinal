@@ -1,0 +1,28 @@
+# Sentinel Development Tasks
+
+- [x] **Module 1: Foundational Setup**
+  - [x] Initialize Next.js project with TypeScript, Tailwind CSS
+  - [x] Install dependencies (Clerk, Prisma, TanStack Query, React Hook Form, Zod, Recharts, Lucide React, shadcn components)
+  - [x] Configure Prisma schema and PostgreSQL database client
+  - [x] Configure Clerk middleware and route protection
+- [x] **Module 2: Core Platform Implementation**
+  - [x] Write database schema models in `schema.prisma`
+  - [x] Apply Prisma migrations to Neon Database
+  - [x] Write seed script `prisma/seed.ts`
+  - [x] Create database core services (Monitor, Incident, Audit, Analytics)
+  - [x] Implement Monitor CRUD API endpoints
+  - [x] Implement Dashboard aggregate metrics API endpoint
+  - [x] Create Dashboard sidebar, header, and KPI overview cards
+  - [x] Build Monitors list table with tag filtering & status indicators
+  - [x] Create Add/Edit/Delete Monitor dialog components (React Hook Form + Zod)
+  - [x] Implement Detailed Monitor tabs view (Overview, Checks, SSL, Incidents, Analytics, Settings)
+- [x] **Module 3: Background Engine & Notifications**
+  - [x] Implement ping utility and SSL certificate verification parser
+  - [x] Create `/api/cron/monitor` background jobs executor
+  - [x] Integrate Resend to email users on status shifts & SSL warnings
+  - [x] Create `/status/[slug]` dynamic public status layout
+- [x] **Production Stabilization & Fixes**
+  - [x] **1. Robust User Synchronization**: Implement inline user auto-synchronization helper (`getOrCreateCurrentUser()`)
+  - [x] **2. Prevent Duplicate Cron Executions**: Global singleton state registration to avoid double cron instances on hot-reload
+  - [x] **3. Eliminate Connection Contention**: Remove transactional blocks in scheduler to optimize query pings
+  - [x] **4. Verification**: Success run of `npx tsc --noEmit && npm run lint`

@@ -1,0 +1,144 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+interface CreateMonitorPayload {
+  name: string;
+  url: string;
+  type: "HTTP" | "PING" | "TCP" | "SSL";
+  monitorInterval: number;
+  tags?: string[];
+}
+
+interface UpdateMonitorPayload {
+  name?: string;
+  url?: string;
+  monitorInterval?: number;
+  isActive?: boolean;
+  tags?: string[];
+}
+
+export function useDashboardMetrics() {
+  return useQuery({
+    queryKey: ["dashboard-metrics"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard/metrics");
+      if (!res.ok) throw new Error("Failed to fetch dashboard metrics");
+      return res.json();
+    },
+  });
+}
+
+export function useMonitors(tagFilter?: string) {
+  return useQuery({
+    queryKey: ["monitors", tagFilter],
+    queryFn: async () => {
+      const url = tagFilter ? `/api/monitors?tag=${encodeURIComponent(tagFilter)}` : "/api/monitors";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch monitors");
+      return res.json();
+    },
+  });
+}
+
+export function useMonitor(id: string) {
+  return useQuery({
+    queryKey: ["monitor", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/monitors/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch monitor details");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useMonitorAnalytics(id: string, days = 7) {
+  return useQuery({
+    queryKey: ["monitor-analytics", id, days],
+    queryFn: async () => {
+      const res = await fetch(`/api/monitors/${id}/analytics?days=${days}`);
+      if (!res.ok) throw new Error("Failed to fetch monitor analytics");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useMonitorChecks(id: string, limit = 50) {
+  return useQuery({
+    queryKey: ["monitor-checks", id, limit],
+    queryFn: async () => {
+      const res = await fetch(`/api/monitors/${id}/checks?limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch monitor checks");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useMonitorIncidents(id: string) {
+  return useQuery({
+    queryKey: ["monitor-incidents", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/monitors/${id}/incidents`);
+      if (!res.ok) throw new Error("Failed to fetch monitor incidents");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateMonitor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CreateMonitorPayload) => {
+      const res = await fetch("/api/monitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to create monitor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["monitors"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+    },
+  });
+}
+
+export function useUpdateMonitor(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: UpdateMonitorPayload) => {
+      const res = await fetch(`/api/monitors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to update monitor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["monitors"] });
+      queryClient.invalidateQueries({ queryKey: ["monitor", id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+    },
+  });
+}
+
+export function useDeleteMonitor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/monitors/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete monitor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["monitors"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+    },
+  });
+}
