@@ -12,11 +12,15 @@ const envSchema = z.object({
   EMAIL_FROM_ADDRESS: z.string().email().default("alerts@sentinel.local"),
 });
 
+// For build-time checks on Vercel where production env vars are not fully loaded in the container,
+// we parse using a relaxed schema or fallback values to prevent build crashes.
+const isVercelBuild = process.env.NODE_ENV === "production" && !process.env.DATABASE_URL;
+
 const parsed = envSchema.safeParse({
-  DATABASE_URL: process.env.DATABASE_URL,
+  DATABASE_URL: process.env.DATABASE_URL || (isVercelBuild ? "postgresql://fallback:5432/db" : undefined),
   DIRECT_URL: process.env.DIRECT_URL,
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || (isVercelBuild ? "pk_fallback" : undefined),
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || (isVercelBuild ? "sk_fallback" : undefined),
   CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
   CRON_SECRET: process.env.CRON_SECRET,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
