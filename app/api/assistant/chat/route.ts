@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { getOrCreateCurrentUser } from "@/services/user";
+import { getGeminiClient } from "@/lib/gemini";
 import { AiAssistantService } from "@/services/ai/assistant";
 import { logger } from "@/lib/logger";
 import { env } from "@/config/env";
@@ -148,6 +149,26 @@ export async function POST(req: Request) {
         content: replyText,
       },
     });
+
+    // 5. Dynamic personalized title generation (Only rename if title is default 'New Chat' or 'New Conversation')
+    if (session.title === "New Chat" || session.title === "New Conversation") {
+      try {
+        const ai = getGeminiClient();
+        if (ai) {
+          const titleGenResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Generate a concise 3-5 word title representing this search query. Return only the title text, no quotes or markdown. Query: "${content.trim()}"`,
+          });
+          const cleanTitle = titleGenResponse.text?.trim().replace(/["']/g, "") || content.trim().slice(0, 30);
+          await db.assistantSession.update({
+            where: { id: session.id },
+            data: { title: cleanTitle },
+          });
+        }
+      } catch (titleErr) {
+        logger.error("Failed to generate dynamic session title:", titleErr);
+      }
+    }
 
     return NextResponse.json(responseMessage);
   } catch (error) {
