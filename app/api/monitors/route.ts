@@ -3,6 +3,7 @@ import { MonitorService } from "@/services/monitor";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getOrCreateCurrentUser } from "@/services/user";
+import { db } from "@/lib/prisma";
 
 const MONITOR_TYPES = ["HTTP", "HTTPS", "TCP", "SSL", "PING", "JSON_API"] as const;
 
@@ -94,6 +95,29 @@ export async function POST(req: Request) {
       jsonPath: payload.jsonPath,
       jsonPathExpected: payload.jsonPathExpected,
       tcpPort: payload.tcpPort,
+    });
+
+    // Dynamically import SchedulerService to prevent circular dependencies
+    import("@/services/scheduler").then(({ SchedulerService }) => {
+      // Find full monitor structure to trigger checks (including user notifications settings)
+      db.monitor.findUnique({
+        where: { id: monitor.id },
+        include: {
+          user: {
+            include: {
+              settings: true,
+            },
+          },
+        },
+      }).then((fullMonitor) => {
+        if (fullMonitor) {
+          SchedulerService.checkMonitor(fullMonitor).catch((err) => {
+            logger.error(`Initial check failed for monitor ${monitor.id}:`, err);
+          });
+        }
+      });
+    }).catch(err => {
+      logger.error("Failed to load SchedulerService for initial check:", err);
     });
 
     return NextResponse.json(monitor, { status: 201 });
