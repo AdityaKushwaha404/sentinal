@@ -86,14 +86,14 @@ function IncidentRow({ incident }: { incident: Incident }) {
         <TableRow className="bg-muted/20 border-border hover:bg-muted/20">
           <TableCell colSpan={4} className="p-4 border-t-0">
             <div className="rounded-xl border border-border bg-card/65 p-4 space-y-3.5 shadow-inner">
-              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/60 pb-2 gap-2">
                 <h4 className="text-xs font-extrabold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
                   <Cpu className="h-3.5 w-3.5 text-blue-500" />
                   Gemini Incident Diagnostics
                 </h4>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground font-semibold">Confidence:</span>
-                  <Badge className={incident.aiConfidenceScore && incident.aiConfidenceScore > 0.7 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
+                  <Badge className={incident.aiConfidenceScore && incident.aiConfidenceScore > 0.7 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"}>
                     {incident.aiConfidenceScore ? `${Math.round(incident.aiConfidenceScore * 100)}%` : "N/A"}
                   </Badge>
                 </div>

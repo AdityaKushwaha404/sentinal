@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/prisma";
+import { getOrCreateCurrentUser } from "@/services/user";
 import { logger } from "@/lib/logger";
 
 // GET: Load chat messages for a specific session
@@ -8,15 +8,15 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const user = await getOrCreateCurrentUser();
   const { id } = await params;
-  if (!userId) {
+  if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
   try {
     const session = await db.assistantSession.findFirst({
-      where: { id, userId },
+      where: { id, userId: user.id },
     });
 
     if (!session) {
@@ -40,9 +40,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const user = await getOrCreateCurrentUser();
   const { id } = await params;
-  if (!userId) {
+  if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -53,7 +53,7 @@ export async function PATCH(
     }
 
     const session = await db.assistantSession.findFirst({
-      where: { id, userId },
+      where: { id, userId: user.id },
     });
 
     if (!session) {
@@ -77,15 +77,15 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const user = await getOrCreateCurrentUser();
   const { id } = await params;
-  if (!userId) {
+  if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
   try {
     const session = await db.assistantSession.findFirst({
-      where: { id, userId },
+      where: { id, userId: user.id },
     });
 
     if (!session) {

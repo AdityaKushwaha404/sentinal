@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/prisma";
+import { getOrCreateCurrentUser } from "@/services/user";
 import { logger } from "@/lib/logger";
 
 // GET: List all sessions
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
+  const user = await getOrCreateCurrentUser();
+  if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
   try {
     const sessions = await db.assistantSession.findMany({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { updatedAt: "desc" },
     });
     return NextResponse.json(sessions);
@@ -24,8 +25,8 @@ export async function GET() {
 
 // POST: Create a new session
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) {
+  const user = await getOrCreateCurrentUser();
+  if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     const { title } = await req.json();
     const session = await db.assistantSession.create({
       data: {
-        userId,
+        userId: user.id,
         title: title?.trim() || "New Chat Session",
       },
     });

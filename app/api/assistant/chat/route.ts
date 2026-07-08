@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/prisma";
+import { getOrCreateCurrentUser } from "@/services/user";
 import { AiAssistantService } from "@/services/ai/assistant";
 import { logger } from "@/lib/logger";
 import { env } from "@/config/env";
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) {
+  const user = await getOrCreateCurrentUser();
+  if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     // 1. Verify/Retrieve Session
     const session = await db.assistantSession.findFirst({
-      where: { id: sessionId, userId },
+      where: { id: sessionId, userId: user.id },
     });
 
     if (!session) {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     // 2. Build contextual snapshot for database metrics
     const [monitors, recentIncidents, recentChecks, sslCerts] = await Promise.all([
       db.monitor.findMany({
-        where: { userId },
+        where: { userId: user.id },
         select: {
           id: true,
           name: true,
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         },
       }),
       db.incident.findMany({
-        where: { monitor: { userId } },
+        where: { monitor: { userId: user.id } },
         orderBy: { startedAt: "desc" },
         take: 8,
         select: {
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
         },
       }),
       db.monitorCheck.findMany({
-        where: { monitor: { userId } },
+        where: { monitor: { userId: user.id } },
         orderBy: { checkedAt: "desc" },
         take: 15,
         select: {
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
         },
       }),
       db.sSLCertificate.findMany({
-        where: { monitor: { userId } },
+        where: { monitor: { userId: user.id } },
         select: {
           monitor: { select: { name: true } },
           issuer: true,

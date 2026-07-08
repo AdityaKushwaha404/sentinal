@@ -3,10 +3,13 @@ import { SchedulerService } from "@/services/scheduler";
 import { logger } from "@/lib/logger";
 
 export async function GET(req: Request) {
-  // Optional: Verify request against a secret key if set in environment
+  // Optional:  // Verify request against a secret key if set in environment (only enforce Bearer check if header is present or if explicitly not matching in production)
   const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    logger.warn("Unauthorized request attempt to cron endpoint");
+  const hasSecret = !!process.env.CRON_SECRET;
+  const isCorrectBearer = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  
+  if (hasSecret && process.env.NODE_ENV === "production" && !isCorrectBearer) {
+    logger.warn("Unauthorized request attempt to cron endpoint in production environment");
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

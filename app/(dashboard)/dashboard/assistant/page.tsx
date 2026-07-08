@@ -220,10 +220,10 @@ export default function AssistantPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-140px)] gap-6 w-full max-w-7xl mx-auto items-stretch">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-120px)] md:h-[calc(100vh-140px)] gap-4 md:gap-6 w-full max-w-7xl mx-auto items-stretch overflow-hidden">
       {/* Sidebar: Chat sessions list */}
-      <div className="w-80 flex flex-col border border-border/80 bg-card rounded-2xl p-4 overflow-hidden shrink-0 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="w-full md:w-80 flex flex-col border border-border/80 bg-card rounded-2xl p-4 overflow-hidden shrink-0 shadow-sm max-h-[220px] md:max-h-none">
+        <div className="flex items-center justify-between mb-2 md:mb-4">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <MessageSquare className="h-4 w-4 text-blue-500" />
             Conversations
