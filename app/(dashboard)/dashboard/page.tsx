@@ -61,7 +61,7 @@ export default function DashboardPage() {
   // React Query hooks
   const { data: metrics } = useDashboardMetrics();
   const { data: monitors, isLoading: isMonitorsLoading } = useMonitors();
-  const updateMonitor = useUpdateMonitor(selectedMonitor?.id || "");
+  const updateMonitor = useUpdateMonitor();
   const deleteMonitor = useDeleteMonitor();
 
   const editForm = useForm<MonitorFormValues>({
@@ -69,9 +69,11 @@ export default function DashboardPage() {
   });
 
   const onEditSubmit = (values: MonitorFormValues) => {
+    if (!selectedMonitor) return;
     const tags = values.tagsInput ? values.tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
     updateMonitor.mutate(
       {
+        id: selectedMonitor.id,
         name: values.name,
         url: values.url,
         monitorInterval: values.monitorInterval,
@@ -115,6 +117,7 @@ export default function DashboardPage() {
 
   const toggleActive = (monitor: Monitor) => {
     updateMonitor.mutate({
+      id: monitor.id,
       isActive: !monitor.isActive,
     });
   };

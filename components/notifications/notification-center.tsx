@@ -42,6 +42,23 @@ export function NotificationCenter() {
       if (!res.ok) throw new Error("Failed to mark notifications read");
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previous = queryClient.getQueryData<any>(["notifications"]);
+
+      if (previous) {
+        queryClient.setQueryData(["notifications"], {
+          notifications: previous.notifications.map((n: any) => ({ ...n, isRead: true })),
+          unreadCount: 0,
+        });
+      }
+      return { previous };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications"], context.previous);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -52,6 +69,25 @@ export function NotificationCenter() {
       const res = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
       if (!res.ok) throw new Error("Failed to mark notification read");
       return res.json();
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previous = queryClient.getQueryData<any>(["notifications"]);
+
+      if (previous) {
+        queryClient.setQueryData(["notifications"], {
+          notifications: previous.notifications.map((n: any) =>
+            n.id === id ? { ...n, isRead: true } : n
+          ),
+          unreadCount: Math.max(0, previous.unreadCount - 1),
+        });
+      }
+      return { previous };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications"], context.previous);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });

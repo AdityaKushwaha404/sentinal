@@ -71,7 +71,7 @@ export default function MonitorDetailsPage({ params }: PageProps) {
   const { data: analytics, isLoading: isAnalyticsLoading } = useMonitorAnalytics(id, analyticsDays);
   const { data: checks, isLoading: isChecksLoading } = useMonitorChecks(id, 50);
   const { data: incidents, isLoading: isIncidentsLoading } = useMonitorIncidents(id);
-  const updateMonitor = useUpdateMonitor(id);
+  const updateMonitor = useUpdateMonitor();
   const deleteMonitor = useDeleteMonitor();
 
   // Settings form setup
@@ -115,7 +115,10 @@ export default function MonitorDetailsPage({ params }: PageProps) {
   // Settings form action
   const onSettingsSubmit = (values: SettingsFormValues) => {
     setSaveSuccess(false);
-    updateMonitor.mutate(values, {
+    updateMonitor.mutate({
+      id,
+      ...values,
+    }, {
       onSuccess: () => {
         refetchMonitor();
         setSaveSuccess(true);
@@ -137,6 +140,7 @@ export default function MonitorDetailsPage({ params }: PageProps) {
 
   const handleToggleActive = () => {
     updateMonitor.mutate({
+      id,
       isActive: !monitor.isActive,
     }, {
       onSuccess: () => refetchMonitor(),

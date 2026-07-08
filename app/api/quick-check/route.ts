@@ -133,6 +133,9 @@ export async function POST(req: Request) {
       type,
       startedAt,
       ...result,
+      ok: result.isAvailable,
+      status: result.statusCode,
+      latency: result.responseTime,
       ssl: sslInfo
         ? `${sslInfo.status} — ${sslInfo.remainingDays} days remaining (Issuer: ${sslInfo.issuer || "Unknown"})`
         : null,
