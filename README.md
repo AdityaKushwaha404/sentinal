@@ -1,125 +1,111 @@
-# Sentinel | Website & API Monitoring Platform
+# 🛡️ Sentinel — Real-Time Infrastructure Monitoring Engine
 
-Sentinel is a production-grade, high-performance Website & Operations Monitoring SaaS platform designed for modern tech squads. It observes website availability, computes latency timeseries, validates SSL socket certificates, and dispatches automated incident alerts.
+Sentinel is a production-grade, commercial-ready SaaS infrastructure monitoring platform. Built using **Next.js**, **Prisma ORM**, **Tailwind CSS**, and **React Query**, it allows engineering teams to observe, analyze, and alerts on network components globally with sub-second precision.
 
 ---
 
-## Architecture Design
+## 🚀 Key Features
+
+*   **Multi-Monitor Support**: Check target endpoints using **HTTP**, **HTTPS**, **TCP Port**, **SSL Certificates**, **JSON APIs**, and simulated **PING** fallbacks.
+*   **Operations Center**: An interactive real-time dashboard displaying average response latency, operational uptime ratios, active alerts, and status lists.
+*   **Instant UI Interactions**: Responsive toggle actions and alert deletions with optimistic updates.
+*   **Fully Mobile Responsive**: Adapts seamlessly to all mobile screens with a micro-animated hamburger drawer menu.
+*   **Alert History & Incidents**: Automatically creates, monitors, and closes downtime incidents.
+
+---
+
+## 🛠️ Tech Stack & Architecture
 
 ```mermaid
 graph TD
-    Client[Browser / Client UI] -->|HTTPS Requests| NextServer[Next.js App Router Server]
-    NextServer -->|Reads / Writes| NeonDB[(Neon Serverless PostgreSQL)]
-    NextServer -->|Authentication / Sessions| Clerk[Clerk Auth Engine]
-    NextServer -->|Webhooks| WebhookHandler[Clerk Sync Endpoint]
-    WebhookHandler -->|Register Users| NeonDB
-    
-    CronWorker[Background Cron scheduler] -->|Orchestrates| SchedulerService[Scheduler Service]
-    SchedulerService -->|Uptime Ping Probes| PublicWebsites[Public Websites & APIs]
-    SchedulerService -->|TLS handshake| SSLSockets[SSL Sockets Port 443]
-    SchedulerService -->|Write Check Results| NeonDB
-    SchedulerService -->|Trigger Incidents| IncidentManager[Incident Auto-Manager]
-    IncidentManager -->|Downtime Logs| NeonDB
-    IncidentManager -->|Alerts| Resend[Resend Email API]
-    Resend -->|Notification Dispatches| AdminMail[User Inbox]
+  A[Client UI - Next.js/React] -->|React Query Polling| B[Serverless Route Handlers]
+  B -->|Prisma Client| C[Neon PostgreSQL Database]
+  D[Cron Trigger - Cron/Monitor] -->|SchedulerService| B
+  B -->|Prober Engine| E[Target Server / API / TCP Port]
 ```
 
----
-
-## Technology Stack
-
-*   **Framework**: Next.js 16 (App Router with Turbopack)
-*   **Language**: TypeScript (Strict Mode)
-*   **Database**: Neon Serverless PostgreSQL
-*   **ORM**: Prisma 7 (Neon serverless adapter)
-*   **Authentication**: Clerk Auth (Proxy middleware & session tracking)
-*   **Styling**: Tailwind CSS & shadcn/ui
-*   **State Management**: TanStack React Query (React Query)
-*   **Form Management**: React Hook Form & Zod Schema Validation
-*   **Charts**: Recharts (Latency area analytics)
-*   **Email Engine**: Resend API
+*   **Framework**: Next.js 16 (Dynamic Serverless Rendering)
+*   **Database**: PostgreSQL hosted on Neon DB, managed via Prisma ORM.
+*   **State Management**: React Query (configured with 10s automatic polling and optimistic UI cache invalidations).
+*   **Security & Authentication**: Clerk Auth integration.
 
 ---
 
-## Folder Structure
+## 🔧 Setup & Local Development
 
-```text
-sentinel/
-├── app/                  # Next.js App Router pages, APIs, and routes
-│   ├── (auth)/           # Clerk authentication layouts
-│   ├── (dashboard)/      # Protected workspace dashboard
-│   ├── (marketing)/      # Bento Grid landing page and layout
-│   ├── api/              # API Route Handlers (cron, monitors, health)
-│   └── status/           # Dynamic public status pages
-├── components/           # Generic pure UI elements (button, dialog, input, etc.)
-├── config/               # Settings schemas and environment validations
-├── hooks/                # Custom React Query hooks
-├── jobs/                 # Cron orchestrators & background worker engines
-├── lib/                  # Client instantiations (db connection, logger)
-├── prisma/               # Schema specifications, seed data, and configs
-├── services/             # Pure business logic services (monitor, audit, analytics)
-├── types/                # Domain TypeScript typings
-└── utils/                # Utility checkers (ping socket, host extractions)
-```
-
----
-
-## Installation & Setup
-
-### 1. Configure Local Environment
-Copy `.env.example` to create `.env.local`:
+### 1. Clone & Install Dependencies
 ```bash
-cp .env.example .env.local
-```
-Fill in the configuration parameters inside `.env.local`:
-*   `DATABASE_URL` / `DIRECT_URL` (Neon PostgreSQL)
-*   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` (Clerk Auth keys)
-*   `CLERK_WEBHOOK_SECRET` (Clerk Webhooks integration)
-*   `RESEND_API_KEY` (Resend Email key)
-
-### 2. Install Project Dependencies
-Run npm installer to fetch required packages:
-```bash
+git clone https://github.com/AdityaKushwaha404/sentinal.git
+cd sentinel
 npm install
 ```
 
-### 3. Initialize Database & Seeds
-Push database models and populate the PostgreSQL instance with seed records (monitors, checks, incidents):
-```bash
-npx prisma db push
-npx prisma db seed
+### 2. Configure Environment Variables
+Create a `.env.local` file in the root directory:
+```env
+# Database Connections
+DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
+
+# Authentication (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
+CLERK_SECRET_KEY="sk_test_..."
+NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in"
+NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
 ```
 
-### 4. Boot Up Local Development Server
-Launch Turbopack Next.js server:
+### 3. Run Database Migrations
+Generate the client and push the schema changes to your database:
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+### 4. Boot Dev Server
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to inspect.
+Open [http://localhost:3000](http://localhost:3000) to view the application dashboard.
 
 ---
 
-## API Documentation
+## ☁️ Vercel Deployment Guide
 
-### System Diagnostics
-*   `GET /api/health` - Check database connection status and server timestamp.
+To deploy Sentinel onto Vercel, follow these steps:
 
-### Monitoring Controls
-*   `GET /api/monitors` - Retrieve list of monitors.
-*   `POST /api/monitors` - Register a new monitor endpoint.
-*   `GET /api/monitors/[id]` - Retrieve detailed monitor configs.
-*   `PATCH /api/monitors/[id]` - Update monitor check parameters.
-*   `DELETE /api/monitors/[id]` - Delete monitor configuration and history logs.
+### Step 1: Connect GitHub
+1. Push all your updates to your GitHub repository:
+   ```bash
+   git add .
+   git commit -m "prep: configure project for Vercel deployment and build scripts"
+   git push origin main
+   ```
+2. Log into [Vercel](https://vercel.com) and click **Add New Project**.
+3. Select your `sentinal` repository.
 
-### Analytics & Incidents
-*   `GET /api/monitors/[id]/analytics` - Time-series latency database records.
-*   `GET /api/monitors/[id]/checks` - Historical check entries list.
-*   `GET /api/monitors/[id]/incidents` - Incident lifecycles history.
+### Step 2: Configure Vercel Settings
+*   **Framework Preset**: Select `Next.js`.
+*   **Build & Development Settings**: Keep defaults. The `postinstall` script (`prisma generate`) will run automatically to compile the Prisma client types.
+*   **Environment Variables**: Paste all variables from your `.env.local`:
+    *   `DATABASE_URL`
+    *   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+    *   `CLERK_SECRET_KEY`
+    *   `NEXT_PUBLIC_CLERK_SIGN_IN_URL`
+    *   `NEXT_PUBLIC_CLERK_SIGN_UP_URL`
 
----
+### Step 3: Trigger Deploy
+Click **Deploy**. Once complete, Vercel will provide you with a production-ready preview URL.
 
-## Future Roadmap
-
-1. **Multi-Region Check Agents**: Deploy distributed ping runners across global AWS regions (e.g. us-east-1, eu-west-1, ap-southeast-1) to observe regional latency fluctuations.
-2. **Slack & MS Teams Integrations**: Dispatch instant incident notifications directly into developer chat instances.
-3. **Weekly SLA Reports**: Automated compiling of weekly performance digests delivered to system administrators.
+### Step 4: Configure Cron Jobs (Optional)
+To trigger automated uptime checks every minute on Vercel:
+1. Create a `vercel.json` file in the root:
+   ```json
+   {
+     "crons": [
+       {
+         "path": "/api/cron/monitor",
+         "schedule": "* * * * *"
+       }
+     ]
+   }
+   ```
+2. Redeploy the project on Vercel to activate the cron triggers.
