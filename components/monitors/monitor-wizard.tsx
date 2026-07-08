@@ -445,7 +445,18 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
                 <Button 
                   type="button" 
                   size="sm"
-                  onClick={form.handleSubmit(onSubmit)}
+                  onClick={() => {
+                    console.log("Create button clicked!");
+                    form.handleSubmit(
+                      (values) => {
+                        console.log("handleSubmit success:", values);
+                        onSubmit(values);
+                      },
+                      (errors) => {
+                        console.error("handleSubmit validation failed:", errors);
+                      }
+                    )();
+                  }}
                   disabled={createMonitor.isPending}
                   className="rounded-xl flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-0 text-xs font-bold"
                 >
