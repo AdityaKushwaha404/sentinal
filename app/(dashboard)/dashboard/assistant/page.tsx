@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { MessageSquare, Send, Trash2, Edit2, Check, X, Plus, Loader2, Sparkles, User, Brain, AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MessageSquare, Send, Trash2, Edit2, Check, X, Plus, Loader2, Sparkles, User, Brain, Menu, PanelLeftClose, PanelLeft, Bot, Sparkle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +26,7 @@ export default function AssistantPage() {
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   
   // Loading states
   const [isSessionsLoading, setIsSessionsLoading] = useState(true);
@@ -93,12 +93,13 @@ export default function AssistantPage() {
   };
 
   const handleCreateSession = async () => {
+    if (isCreatingSession) return;
     setIsCreatingSession(true);
     try {
       const res = await fetch("/api/assistant/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "New Conversation" }),
+        body: JSON.stringify({ title: "New Chat" }),
       });
       if (res.ok) {
         const newSession = await res.json();
@@ -169,7 +170,6 @@ export default function AssistantPage() {
     setInputText("");
     setIsSending(true);
 
-    // Optimistically add user's message
     const tempUserMsg: Message = {
       id: Math.random().toString(),
       sessionId: activeSession.id,
@@ -192,7 +192,6 @@ export default function AssistantPage() {
       if (res.ok) {
         const aiMsg = await res.json();
         setMessages((prev) => {
-          // Replace temp message or just add the verified assistant message
           const filtered = prev.filter((m) => m.id !== tempUserMsg.id);
           return [...filtered, { ...tempUserMsg, id: aiMsg.id - 1 }, aiMsg];
         });
@@ -202,7 +201,6 @@ export default function AssistantPage() {
       }
     } catch (err: any) {
       console.error("Chat dispatch error:", err);
-      // Append warning message in history block
       setMessages((prev) => [
         ...prev,
         {
@@ -215,39 +213,55 @@ export default function AssistantPage() {
       ]);
     } finally {
       setIsSending(false);
-      fetchSessions(); // Refresh list to update title sorting if desired
+      fetchSessions();
     }
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-120px)] md:h-[calc(100vh-140px)] gap-4 md:gap-6 w-full max-w-7xl mx-auto items-stretch overflow-hidden">
-      {/* Sidebar: Chat sessions list */}
-      <div className="w-full md:w-80 flex flex-col border border-border/80 bg-card rounded-2xl p-4 overflow-hidden shrink-0 shadow-sm max-h-[220px] md:max-h-none">
-        <div className="flex items-center justify-between mb-2 md:mb-4">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <MessageSquare className="h-4 w-4 text-blue-500" />
-            Conversations
-          </h3>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 w-7 rounded-lg p-0 flex items-center justify-center border-border hover:bg-muted"
+    <div className="flex h-[calc(100vh-100px)] w-full max-w-7xl mx-auto rounded-3xl overflow-hidden border border-border bg-[#131314] text-[#e3e3e3] shadow-2xl relative font-sans">
+      
+      {/* Sidebar: Chat sessions list (Gemini Style) */}
+      <div className={`transition-all duration-300 ease-in-out flex flex-col border-r border-[#2d2f31] bg-[#1e1f20] shrink-0 z-20 ${
+        sidebarOpen 
+          ? "w-72 absolute md:relative h-full" 
+          : "w-0 absolute md:relative overflow-hidden border-r-0"
+      }`}>
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[#2d2f31]/60">
+          <button 
             onClick={handleCreateSession}
             disabled={isCreatingSession}
+            className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-[#2a2b2d] hover:bg-[#333537] text-sm font-semibold transition-all border border-[#444746]/50 shadow-sm flex-1 mr-2"
           >
-            {isCreatingSession ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            {isCreatingSession ? (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+            ) : (
+              <Plus className="h-4 w-4 text-blue-400" />
+            )}
+            <span>New Chat</span>
+          </button>
+          
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 rounded-full hover:bg-[#333537] text-[#c4c7c5]"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <PanelLeftClose className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+        {/* Sessions list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1 scrollbar-thin">
+          <div className="text-[11px] font-bold text-[#9aa0a6] uppercase tracking-wider px-3 mb-2">Recent</div>
           {isSessionsLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-xs text-muted-foreground gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-12 text-xs text-[#9aa0a6] gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
               Loading sessions...
             </div>
           ) : sessions.length === 0 ? (
-            <div className="text-center py-12 text-xs font-semibold text-muted-foreground">
-              No conversations started yet.
+            <div className="text-center py-12 text-xs text-[#9aa0a6] font-medium">
+              No conversations yet.
             </div>
           ) : (
             sessions.map((session) => {
@@ -258,65 +272,57 @@ export default function AssistantPage() {
                 <div
                   key={session.id}
                   onClick={() => !isEditing && setActiveSession(session)}
-                  className={`group relative flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer text-xs font-semibold ${
+                  className={`group relative flex items-center justify-between px-3 py-2.5 rounded-full transition-all cursor-pointer text-xs font-semibold ${
                     isSelected
-                      ? "bg-muted/80 border-border text-foreground shadow-sm"
-                      : "bg-transparent border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+                      ? "bg-[#004a77]/20 text-[#c2e7ff] border border-[#004a77]/40"
+                      : "bg-transparent text-[#e3e3e3] hover:bg-[#282a2c]"
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <MessageSquare className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-blue-500" : "text-muted-foreground/60"}`} />
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <MessageSquare className={`h-4 w-4 shrink-0 ${isSelected ? "text-[#7fcfff]" : "text-[#9aa0a6]"}`} />
                     {isEditing ? (
                       <Input
                         value={editTitleText}
                         onChange={(e) => setEditTitleText(e.target.value)}
-                        className="h-6 py-0 px-1 border-border text-xs rounded"
+                        className="h-6 py-0 px-1 border-[#444746] bg-[#1e1f20] text-xs rounded text-[#e3e3e3] focus-visible:ring-0 focus-visible:ring-offset-0"
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
                       />
                     ) : (
-                      <span className="truncate pr-8">{session.title}</span>
+                      <span className="truncate pr-10">{session.title}</span>
                     )}
                   </div>
 
-                  <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {isEditing ? (
                       <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 w-5 p-0 hover:bg-emerald-500/10 hover:text-emerald-500"
+                        <button
+                          className="p-1 hover:bg-[#333537] text-emerald-400 rounded-full"
                           onClick={(e) => handleRenameSession(session.id, e)}
                         >
                           <Check className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                        </button>
+                        <button
+                          className="p-1 hover:bg-[#333537] text-red-400 rounded-full"
                           onClick={(e) => { e.stopPropagation(); setEditingSessionId(null); }}
                         >
                           <X className="h-3 w-3" />
-                        </Button>
+                        </button>
                       </>
                     ) : (
                       <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                        <button
+                          className="p-1 hover:bg-[#333537] text-[#9aa0a6] hover:text-[#e3e3e3] rounded-full"
                           onClick={(e) => startRenameSession(session, e)}
                         >
                           <Edit2 className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                        </button>
+                        <button
+                          className="p-1 hover:bg-[#333537] text-[#9aa0a6] hover:text-red-400 rounded-full"
                           onClick={(e) => handleDeleteSession(session.id, e)}
                         >
                           <Trash2 className="h-3 w-3" />
-                        </Button>
+                        </button>
                       </>
                     )}
                   </div>
@@ -328,135 +334,160 @@ export default function AssistantPage() {
       </div>
 
       {/* Main chat layout */}
-      <div className="flex-1 flex flex-col border border-border/80 bg-card rounded-2xl overflow-hidden shadow-sm">
-        {activeSession ? (
-          <>
-            {/* Header */}
-            <div className="border-b border-border/80 px-6 py-3 flex items-center justify-between shrink-0">
+      <div className="flex-1 flex flex-col bg-[#131314] overflow-hidden h-full">
+        {/* Top Header */}
+        <div className="flex items-center justify-between border-b border-[#2d2f31] px-6 py-3.5 bg-[#131314]/80 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-3">
+            {!sidebarOpen && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-9 w-9 rounded-full hover:bg-[#282a2c] text-[#c4c7c5] mr-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <PanelLeft className="h-5 w-5" />
+              </Button>
+            )}
+            <div>
               <div className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-blue-500 animate-pulse" />
+                <span className="text-[#a8c7fa] text-xs font-bold uppercase tracking-wider">Sentinel Space</span>
+                <span className="bg-[#a8c7fa]/10 text-[#a8c7fa] border border-[#a8c7fa]/20 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase">
+                  v2.1
+                </span>
+              </div>
+              <h2 className="text-sm font-bold text-[#e3e3e3] mt-0.5">
+                {activeSession ? activeSession.title : "Gemini Diagnostics"}
+              </h2>
+            </div>
+          </div>
+          
+          <Badge className="bg-[#004a77]/30 text-[#7fcfff] border border-[#004a77]/50 text-[10px] font-bold px-2.5 py-1">
+            <Sparkles className="h-3 w-3 mr-1 text-[#7fcfff] animate-pulse" /> Gemini Pro
+          </Badge>
+        </div>
+
+        {/* Message Log Canvas */}
+        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6 scrollbar-thin">
+          {activeSession ? (
+            messages.length === 0 ? (
+              <div className="flex flex-col justify-center h-full max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div>
-                  <h4 className="text-sm font-extrabold text-foreground">{activeSession.title}</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground mt-0.5">Sentinel AI context-bound analytics console.</p>
+                  <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-[#4285f4] via-[#9b51e0] to-[#e06c75] bg-clip-text text-transparent">
+                    Hello, Operator.
+                  </h1>
+                  <p className="text-[#9aa0a6] text-sm font-medium mt-2">
+                    How can I assist you with Sentinel analytics monitoring today?
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {[
+                    { text: "Check active monitors status", sub: "Analyze response latency & ping types" },
+                    { text: "Review weekly uptime metrics", sub: "Generate failure rate report" },
+                    { text: "List expiring SSL certificates", sub: "Check certificate status warnings" },
+                    { text: "Show recent server downtime logs", sub: "Investigate downtime duration" }
+                  ].map((card, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setInputText(card.text)}
+                      className="p-4 rounded-2xl bg-[#1e1f20] hover:bg-[#2a2b2d] border border-[#2d2f31] hover:border-[#444746] text-left transition-all group"
+                    >
+                      <Bot className="h-5 w-5 text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
+                      <div className="text-xs font-bold text-[#e3e3e3]">{card.text}</div>
+                      <div className="text-[10px] text-[#9aa0a6] mt-0.5 font-medium">{card.sub}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
-              <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[10px] font-bold uppercase tracking-wider">
-                <Sparkles className="h-2.5 w-2.5 mr-1" /> Gemini Powered
-              </Badge>
-            </div>
-
-            {/* Messages box */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {isMessagesLoading ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  Loading message logs...
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto space-y-3.5">
-                  <Brain className="h-10 w-10 text-muted-foreground/45" />
-                  <div>
-                    <h5 className="text-xs font-extrabold uppercase tracking-wider text-foreground">Ask anything about Sentinel</h5>
-                    <p className="text-muted-foreground text-xs leading-relaxed font-medium mt-1">
-                      Sentinel AI can answer questions about server response times, active/past downtime incidents, SSL certificate expirations, or worst-performing check parameters.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 w-full pt-4">
-                    {[
-                      "Which monitor is slow?",
-                      "Uptime issues this week?",
-                      "SSL certificate expiry dates?",
-                      "Incident count yesterday?"
-                    ].map((example, i) => (
-                      <Button
-                        key={i}
-                        size="sm"
-                        variant="outline"
-                        className="text-[10px] font-bold text-muted-foreground text-left py-2 h-auto block truncate"
-                        onClick={() => setInputText(example)}
-                      >
-                        {example}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                messages.map((message) => {
+            ) : (
+              <div className="max-w-3xl mx-auto space-y-6">
+                {messages.map((message) => {
                   const isModel = message.role === "model";
                   return (
                     <div
                       key={message.id}
-                      className={`flex gap-3 max-w-[85%] ${isModel ? "self-start" : "self-end flex-row-reverse"}`}
+                      className={`flex gap-4 ${isModel ? "self-start" : "self-end flex-row-reverse"}`}
                     >
                       <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 border ${
-                        isModel ? "bg-blue-500/10 border-blue-500/20 text-blue-500" : "bg-muted border-border text-muted-foreground"
+                        isModel 
+                          ? "bg-[#1e1f20] border-[#2d2f31] text-[#7fcfff]" 
+                          : "bg-blue-600 border-transparent text-white"
                       }`}>
-                        {isModel ? <Brain className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                        {isModel ? <Sparkle className="h-4 w-4 fill-current" /> : <User className="h-4 w-4" />}
                       </div>
 
-                      <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed font-medium ${
-                        isModel
-                          ? "bg-card border-border text-foreground"
-                          : "bg-blue-600 border-transparent text-white shadow-sm"
+                      <div className={`p-4 rounded-2xl text-xs leading-relaxed max-w-[80%] ${
+                        isModel 
+                          ? "bg-transparent text-[#e3e3e3] font-medium" 
+                          : "bg-[#2e3135] text-[#f2f2f2] font-semibold border border-[#3e4246]"
                       }`}>
                         <div className="whitespace-pre-wrap">{message.content}</div>
-                        <span className={`block text-[8px] mt-1.5 text-right font-mono ${isModel ? "text-muted-foreground/60" : "text-white/60"}`}>
+                        <span className="block text-[8px] text-[#9aa0a6] mt-2 font-mono">
                           {new Date(message.createdAt).toLocaleTimeString()}
                         </span>
                       </div>
                     </div>
                   );
-                })
-              )}
-              {isSending && (
-                <div className="flex gap-3 max-w-[85%] self-start">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border bg-blue-500/10 border-blue-500/20 text-blue-500">
-                    <Brain className="h-4 w-4 animate-spin" />
-                  </div>
-                  <div className="p-3.5 rounded-2xl border border-border bg-card text-muted-foreground text-xs font-semibold flex items-center gap-1.5">
-                    Analyzing database contexts...
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
+                })}
+              </div>
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto space-y-5">
+              <Bot className="h-14 w-14 text-blue-400 animate-bounce" />
+              <div>
+                <h4 className="text-sm font-extrabold text-[#e3e3e3]">Select a Conversation</h4>
+                <p className="text-[#9aa0a6] text-xs leading-relaxed font-semibold mt-1.5">
+                  Choose an active session from the sidebar or click below to start a new diagnostics chat.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-[#004a77] hover:bg-[#005c95] text-[#c2e7ff] font-bold rounded-full px-5 py-4 border border-[#004a77]/50"
+                onClick={handleCreateSession}
+                disabled={isCreatingSession}
+              >
+                Start New Chat
+              </Button>
             </div>
+          )}
 
-            {/* Input Form */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-border/80 flex gap-2 shrink-0 bg-muted/20">
+          {isSending && (
+            <div className="max-w-3xl mx-auto flex gap-4 self-start">
+              <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border bg-[#1e1f20] border-[#2d2f31] text-[#7fcfff]">
+                <Sparkle className="h-4 w-4 fill-current animate-spin" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-[#9aa0a6] font-semibold">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
+                Querying database metrics...
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input Bar Section */}
+        {activeSession && (
+          <div className="p-4 border-t border-[#2d2f31] bg-[#131314]">
+            <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto relative flex items-center bg-[#1e1f20] border border-[#2d2f31] hover:border-[#444746] rounded-full px-4 py-2 transition-all">
               <Input
                 placeholder="Ask about active incidents, average latency, or SSL certificate expiration dates..."
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 disabled={isSending}
-                className="bg-background border-border text-foreground rounded-xl text-xs placeholder:text-muted-foreground/60"
+                className="flex-1 bg-transparent border-0 text-xs placeholder:text-[#9aa0a6] text-[#e3e3e3] focus-visible:ring-0 focus-visible:ring-offset-0 h-9"
               />
               <Button
                 type="submit"
                 size="sm"
                 disabled={!inputText.trim() || isSending}
-                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 text-xs flex items-center gap-1.5"
+                className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-0 shrink-0 flex items-center justify-center border-0 ml-2"
               >
-                Send <Send className="h-3 w-3" />
+                <Send className="h-3.5 w-3.5" />
               </Button>
             </form>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto space-y-4">
-            <Brain className="h-12 w-12 text-muted-foreground/35 animate-bounce" />
-            <div>
-              <h4 className="text-sm font-extrabold text-foreground">Select a Conversation</h4>
-              <p className="text-muted-foreground text-xs leading-relaxed font-semibold mt-1.5">
-                Choose an active session from the sidebar or initialize a new conversation to query Sentinel data snapshots.
-              </p>
+            <div className="text-[10px] text-center text-[#9aa0a6] mt-2 font-medium">
+              Gemini can make errors. Verify important status checks manually.
             </div>
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl"
-              onClick={handleCreateSession}
-              disabled={isCreatingSession}
-            >
-              Start New Chat
-            </Button>
           </div>
         )}
       </div>
