@@ -31,11 +31,20 @@ const monitorSchema = z.object({
   tagsInput: z.string().optional(),
   // Advanced fields
   httpMethod: z.enum(["GET", "POST", "PUT", "HEAD", "OPTIONS"]).optional(),
-  timeoutMs: z.number().int().min(1000).max(30000).optional(),
-  expectedStatusCode: z.number().int().min(100).max(599).optional(),
+  timeoutMs: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+    z.number().int().min(1000).max(30000).optional()
+  ) as any,
+  expectedStatusCode: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+    z.number().int().min(100).max(599).optional()
+  ) as any,
   jsonPath: z.string().optional(),
   jsonPathExpected: z.string().optional(),
-  tcpPort: z.number().int().min(1).max(65535).optional(),
+  tcpPort: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+    z.number().int().min(1).max(65535).optional()
+  ) as any,
 });
 
 type FormValues = z.infer<typeof monitorSchema>;
@@ -231,7 +240,7 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
                   className="bg-background/50 border-border text-foreground rounded-xl placeholder:text-muted-foreground/60 text-xs focus-visible:ring-1 focus-visible:ring-ring" 
                   placeholder="Production Web Server" 
                 />
-                {form.formState.errors.name && <p className="text-[10px] text-destructive font-bold mt-1">{form.formState.errors.name.message}</p>}
+                {form.formState.errors.name && <p className="text-[10px] text-destructive font-bold mt-1">{String(form.formState.errors.name.message)}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -244,7 +253,7 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
                   className="bg-background/50 border-border text-foreground rounded-xl placeholder:text-muted-foreground/60 text-xs focus-visible:ring-1 focus-visible:ring-ring" 
                   placeholder={["TCP", "PING"].includes(watchType) ? "192.168.1.1" : "https://api.myserver.com/health"} 
                 />
-                {form.formState.errors.url && <p className="text-[10px] text-destructive font-bold mt-1">{form.formState.errors.url.message}</p>}
+                {form.formState.errors.url && <p className="text-[10px] text-destructive font-bold mt-1">{String(form.formState.errors.url.message)}</p>}
               </div>
 
               {["TCP", "PING"].includes(watchType) && (
@@ -257,7 +266,7 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
                     className="bg-background/50 border-border text-foreground rounded-xl placeholder:text-muted-foreground/60 text-xs focus-visible:ring-1 focus-visible:ring-ring" 
                     placeholder="80" 
                   />
-                  {form.formState.errors.tcpPort && <p className="text-[10px] text-destructive font-bold mt-1">{form.formState.errors.tcpPort.message}</p>}
+                  {form.formState.errors.tcpPort && <p className="text-[10px] text-destructive font-bold mt-1">{String(form.formState.errors.tcpPort.message)}</p>}
                 </div>
               )}
             </div>
