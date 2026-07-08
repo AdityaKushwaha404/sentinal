@@ -4,6 +4,7 @@ import { getOrCreateCurrentUser } from "@/services/user";
 import { getGeminiClient } from "@/lib/gemini";
 import { EmailService } from "@/services/emails";
 import { logger } from "@/lib/logger";
+import { Resend } from "resend";
 
 export async function POST() {
   // Debug log – confirms the route was hit
@@ -227,15 +228,7 @@ ${expiringSsl.length > 0 ? `SSL Alert: ${expiringSsl.length} SSL certificate${ex
 
     // ── 6. Send via Resend ───────────────────────────────────────
     console.log('🔔 Preparing to send email via Resend');
-    let resend;
-    try {
-      const { Resend } = await import("resend");
-      resend = new Resend(process.env.RESEND_API_KEY);
-    } catch (importErr) {
-      logger.error("Failed to import Resend SDK:", importErr);
-      console.error('🔔 Resend import error', importErr);
-      return NextResponse.json({ error: "Email service unavailable." }, { status: 500 });
-    }
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const sendResult = await resend.emails.send({
       from: `Sentinel Alerts <${process.env.EMAIL_FROM_ADDRESS || "onboarding@resend.dev"}>`,
