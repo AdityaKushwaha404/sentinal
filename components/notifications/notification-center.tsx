@@ -100,12 +100,12 @@ export function NotificationCenter() {
   return (
     <Popover.Root>
       <Popover.Trigger
-        className="relative p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted cursor-pointer transition-colors focus:outline-none flex items-center justify-center"
+        className="relative p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted/70 cursor-pointer transition-all focus:outline-none flex items-center justify-center border border-transparent hover:border-border/40 shadow-xs"
         aria-label="Notifications"
       >
-        <Bell className="h-4.5 w-4.5" />
+        <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white ring-2 ring-background animate-pulse">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-extrabold text-white ring-2 ring-background animate-pulse">
             {unreadCount}
           </span>
         )}
@@ -113,28 +113,28 @@ export function NotificationCenter() {
       
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-50 outline-none">
-          <Popover.Popup className="z-50 w-80 max-h-[400px] overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 flex flex-col">
+          <Popover.Popup className="z-50 w-80 max-h-[420px] overflow-hidden rounded-2xl bg-card/95 border border-border/80 shadow-2xl backdrop-blur-md flex flex-col focus:outline-none animate-in fade-in-50 slide-in-from-top-1 duration-200">
             
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
-              <span className="text-xs font-bold uppercase tracking-wider">Alert Center</span>
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/60 bg-muted/30">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Alert Center</span>
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllRead.mutate()}
                   disabled={markAllRead.isPending}
-                  className="text-[10px] font-semibold text-emerald-500 hover:text-emerald-400 disabled:opacity-50 flex items-center gap-1"
+                  className="text-[10px] font-bold text-emerald-500 hover:text-emerald-400 disabled:opacity-50 flex items-center gap-1 bg-transparent border-0 cursor-pointer transition-colors"
                 >
-                  <Check className="h-3 w-3" /> Mark all read
+                  <Check className="h-3.5 w-3.5" /> Mark all read
                 </button>
               )}
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto divide-y divide-border/60">
+            <div className="flex-1 overflow-y-auto divide-y divide-border/40 scrollbar-none">
               {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-                  <BellOff className="h-8 w-8 opacity-45" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">No alerts logged</span>
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                  <BellOff className="h-10 w-10 opacity-30 stroke-[1.5]" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">No alerts logged</span>
                 </div>
               ) : (
                 notifications.map((n) => {
@@ -142,26 +142,36 @@ export function NotificationCenter() {
                     <div
                       key={n.id}
                       onClick={() => !n.isRead && markRead.mutate(n.id)}
-                      className={`p-3.5 text-left text-xs transition-colors cursor-pointer flex gap-2.5 items-start ${
-                        n.isRead ? "hover:bg-muted/30" : "bg-primary/5 hover:bg-primary/10"
+                      className={`p-4 text-left text-xs transition-all flex gap-3 items-start select-none ${
+                        n.isRead 
+                          ? "opacity-65 hover:opacity-100 hover:bg-muted/15 cursor-default" 
+                          : "bg-emerald-500/[0.02] hover:bg-emerald-500/[0.04] cursor-pointer"
                       }`}
                     >
-                      {n.type === "DOWNTIME_ALERT" ? (
-                        <ShieldAlert className="h-4.5 w-4.5 text-destructive shrink-0 mt-0.5" />
-                      ) : n.type === "UPTIME_RECOVERY" ? (
-                        <ShieldCheck className="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" />
-                      ) : (
-                        <AlertCircle className="h-4.5 w-4.5 text-amber-500 shrink-0 mt-0.5" />
-                      )}
+                      <div className="mt-0.5 shrink-0">
+                        {n.type === "DOWNTIME_ALERT" ? (
+                          <div className="p-1 rounded-lg bg-destructive/10 border border-destructive/20">
+                            <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
+                          </div>
+                        ) : n.type === "UPTIME_RECOVERY" ? (
+                          <div className="p-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                          </div>
+                        ) : (
+                          <div className="p-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                            <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                          </div>
+                        )}
+                      </div>
                       
-                      <div className="flex-1 space-y-0.5 min-w-0">
+                      <div className="flex-1 space-y-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-foreground truncate">{n.title || n.monitor.name}</span>
-                          <span className="text-[9px] text-muted-foreground shrink-0">
+                          <span className="font-bold text-foreground truncate text-[11px] tracking-tight">{n.title || n.monitor.name}</span>
+                          <span className="text-[9px] text-muted-foreground shrink-0 font-medium">
                             {new Date(n.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">{n.message}</p>
+                        <p className="text-[10px] text-muted-foreground leading-normal line-clamp-2 font-medium">{n.message}</p>
                       </div>
                     </div>
                   );
