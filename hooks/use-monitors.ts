@@ -139,19 +139,28 @@ export function useUpdateMonitor() {
       await queryClient.cancelQueries({ queryKey: ["monitors"] });
       await queryClient.cancelQueries({ queryKey: ["monitor", id] });
 
-      // Snapshot previous values
-      const previousMonitors = queryClient.getQueryData<any[]>(["monitors"]);
+      // Get all query cache items for "monitors" (which may have filters like ["monitors", "ALL"])
+      const queryCache = queryClient.getQueryCache();
+      const monitorsQueries = queryCache.findAll({ queryKey: ["monitors"] });
+
+      // Store previous snapshots for rollbacks
+      const previousSnapshots = monitorsQueries.map((query) => ({
+        queryKey: query.queryKey,
+        data: query.state.data,
+      }));
+
       const previousMonitor = queryClient.getQueryData<any>(["monitor", id]);
 
-      // Optimistically update ["monitors"] cache
-      if (previousMonitors) {
-        queryClient.setQueryData(
-          ["monitors"],
-          previousMonitors.map((m) =>
-            m.id === id ? { ...m, ...payload } : m
-          )
-        );
-      }
+      // Optimistically update all found "monitors" queries in cache
+      monitorsQueries.forEach((query) => {
+        const data = query.state.data as any[];
+        if (data) {
+          queryClient.setQueryData(
+            query.queryKey,
+            data.map((m) => (m.id === id ? { ...m, ...payload } : m))
+          );
+        }
+      });
 
       // Optimistically update single ["monitor", id] cache
       if (previousMonitor) {
@@ -161,13 +170,15 @@ export function useUpdateMonitor() {
         });
       }
 
-      return { previousMonitors, previousMonitor, id };
+      return { previousSnapshots, previousMonitor, id };
     },
     onError: (err, variables, context: any) => {
       // Rollback cache if mutation fails
       if (context) {
-        if (context.previousMonitors) {
-          queryClient.setQueryData(["monitors"], context.previousMonitors);
+        if (context.previousSnapshots) {
+          context.previousSnapshots.forEach((snapshot: any) => {
+            queryClient.setQueryData(snapshot.queryKey, snapshot.data);
+          });
         }
         if (context.previousMonitor) {
           queryClient.setQueryData(["monitor", context.id], context.previousMonitor);
