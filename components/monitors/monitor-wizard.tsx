@@ -67,7 +67,7 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
       monitorInterval: 5,
       tagsInput: "",
       httpMethod: "GET",
-      timeoutMs: 8000,
+      timeoutMs: 30000,
     },
   });
 

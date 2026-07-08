@@ -64,7 +64,7 @@ export class SchedulerService {
     let errorMessage: string | null = null;
 
     const monitorType = monitor.type || "HTTP";
-    const timeoutMs = monitor.timeoutMs ?? 8000;
+    const timeoutMs = monitor.timeoutMs ?? 30000;
 
     // Parse headers stored as JSON
     let parsedHeaders: Record<string, string> = {};
