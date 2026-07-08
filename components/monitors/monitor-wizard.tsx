@@ -98,7 +98,9 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
       }
     }
 
+    console.log("Validating fields:", fieldsToValidate);
     const isValid = await form.trigger(fieldsToValidate);
+    console.log("Validation result:", isValid, "Form errors:", form.formState.errors);
     if (isValid) {
       setStep((s) => s + 1);
     }
@@ -109,9 +111,23 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
   };
 
   const onSubmit = (values: FormValues) => {
+    console.log("Submitting monitor values:", values);
     const tags = values.tagsInput 
       ? values.tagsInput.split(",").map(t => t.trim()).filter(Boolean) 
       : [];
+
+    // Filter NaN values from optional number fields (HTML inputs yield NaN if empty)
+    const expectedStatusCode = values.expectedStatusCode && !isNaN(values.expectedStatusCode)
+      ? values.expectedStatusCode
+      : undefined;
+
+    const tcpPort = values.tcpPort && !isNaN(values.tcpPort)
+      ? values.tcpPort
+      : undefined;
+
+    const timeoutMs = values.timeoutMs && !isNaN(values.timeoutMs)
+      ? values.timeoutMs
+      : undefined;
 
     createMonitor.mutate(
       {
@@ -121,18 +137,22 @@ export function MonitorWizard({ isOpen, onOpenChange }: MonitorWizardProps) {
         monitorInterval: values.monitorInterval,
         tags,
         httpMethod: values.httpMethod,
-        timeoutMs: values.timeoutMs,
-        expectedStatusCode: values.expectedStatusCode,
-        jsonPath: values.jsonPath,
-        jsonPathExpected: values.jsonPathExpected,
-        tcpPort: values.tcpPort,
+        timeoutMs,
+        expectedStatusCode,
+        jsonPath: values.jsonPath || undefined,
+        jsonPathExpected: values.jsonPathExpected || undefined,
+        tcpPort,
       },
       {
         onSuccess: () => {
+          console.log("Monitor created successfully!");
           onOpenChange(false);
           setStep(1);
           form.reset();
         },
+        onError: (err) => {
+          console.error("Mutation failed to create monitor:", err);
+        }
       }
     );
   };
