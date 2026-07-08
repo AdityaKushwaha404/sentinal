@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, Check, AlertCircle, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Bell, BellOff, Check, AlertCircle, ShieldAlert, ShieldCheck, Trash2 } from "lucide-react";
 import { Popover } from "@base-ui/react/popover";
 import { Button } from "@/components/ui/button";
 
@@ -94,6 +94,37 @@ export function NotificationCenter() {
     },
   });
 
+  const deleteNotification = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/notifications/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete notification");
+      return res.json();
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previous = queryClient.getQueryData<any>(["notifications"]);
+
+      if (previous) {
+        const deletedItem = previous.notifications.find((n: any) => n.id === id);
+        const unreadDiff = deletedItem && !deletedItem.isRead ? 1 : 0;
+
+        queryClient.setQueryData(["notifications"], {
+          notifications: previous.notifications.filter((n: any) => n.id !== id),
+          unreadCount: Math.max(0, previous.unreadCount - unreadDiff),
+        });
+      }
+      return { previous };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications"], context.previous);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
   const notifications = data?.notifications ?? [];
   const unreadCount = data?.unreadCount ?? 0;
 
@@ -142,7 +173,7 @@ export function NotificationCenter() {
                     <div
                       key={n.id}
                       onClick={() => !n.isRead && markRead.mutate(n.id)}
-                      className={`p-4 text-left text-xs transition-all flex gap-3 items-start select-none ${
+                      className={`p-4 text-left text-xs transition-all flex gap-3 items-start select-none group relative ${
                         n.isRead 
                           ? "opacity-65 hover:opacity-100 hover:bg-muted/15 cursor-default" 
                           : "bg-emerald-500/[0.02] hover:bg-emerald-500/[0.04] cursor-pointer"
@@ -164,7 +195,7 @@ export function NotificationCenter() {
                         )}
                       </div>
                       
-                      <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex-1 space-y-1 min-w-0 pr-6">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-bold text-foreground truncate text-[11px] tracking-tight">{n.title || n.monitor.name}</span>
                           <span className="text-[9px] text-muted-foreground shrink-0 font-medium">
@@ -173,6 +204,18 @@ export function NotificationCenter() {
                         </div>
                         <p className="text-[10px] text-muted-foreground leading-normal line-clamp-2 font-medium">{n.message}</p>
                       </div>
+
+                      {/* Hover Trash Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification.mutate(n.id);
+                        }}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive text-muted-foreground bg-transparent border-0 cursor-pointer"
+                        title="Delete Alert"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   );
                 })
