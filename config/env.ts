@@ -10,6 +10,10 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
   RESEND_API_KEY: z.string().optional().or(z.literal("")),
   EMAIL_FROM_ADDRESS: z.string().email().default("alerts@sentinel.local"),
+  GEMINI_API_KEY: z.string().optional().or(z.literal("")),
+  ENABLE_AI: z.preprocess((val) => val === "true" || val === true, z.boolean()).default(false),
+  ENABLE_WEEKLY_REPORT: z.preprocess((val) => val === "true" || val === true, z.boolean()).default(false),
+  ENABLE_AI_ASSISTANT: z.preprocess((val) => val === "true" || val === true, z.boolean()).default(false),
 });
 
 // For build-time checks on Vercel where production env vars are not fully loaded in the container,
@@ -26,6 +30,10 @@ const parsed = envSchema.safeParse({
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  ENABLE_AI: process.env.ENABLE_AI,
+  ENABLE_WEEKLY_REPORT: process.env.ENABLE_WEEKLY_REPORT,
+  ENABLE_AI_ASSISTANT: process.env.ENABLE_AI_ASSISTANT,
 });
 
 if (!parsed.success) {

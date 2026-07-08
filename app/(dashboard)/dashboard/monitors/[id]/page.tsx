@@ -38,6 +38,94 @@ interface Incident {
   description: string | null;
   startedAt: string;
   resolvedAt: string | null;
+  
+  // AI summary fields
+  aiSummary: string | null;
+  aiLikelyCause: string | null;
+  aiRecommendedActions: string | null;
+  aiConfidenceScore: number | null;
+  aiGeneratedAt: string | null;
+}
+
+// Collapsible row helper subcomponent for rendering AI Analysis
+function IncidentRow({ incident }: { incident: Incident }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <>
+      <TableRow 
+        className="border-border hover:bg-muted/50 transition-colors cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <TableCell className="font-semibold text-foreground">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
+              {incident.title}
+              {incident.aiSummary && (
+                <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[9px] h-4 py-0 flex items-center gap-0.5 font-bold uppercase">
+                  <Zap className="h-2 w-2" /> AI Analyzed
+                </Badge>
+              )}
+            </span>
+            <span className="text-xs text-muted-foreground font-medium">{incident.description}</span>
+          </div>
+        </TableCell>
+        <TableCell>
+          <Badge className={incident.status === "RESOLVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25" : "bg-destructive/10 text-destructive border-destructive/25"}>
+            {incident.status}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-muted-foreground text-xs font-mono">
+          {new Date(incident.startedAt).toLocaleString()}
+        </TableCell>
+        <TableCell className="text-muted-foreground text-xs font-mono">
+          {incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString() : <span className="text-destructive font-bold animate-pulse">Active</span>}
+        </TableCell>
+      </TableRow>
+      {expanded && incident.aiSummary && (
+        <TableRow className="bg-muted/20 border-border hover:bg-muted/20">
+          <TableCell colSpan={4} className="p-4 border-t-0">
+            <div className="rounded-xl border border-border bg-card/65 p-4 space-y-3.5 shadow-inner">
+              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                <h4 className="text-xs font-extrabold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                  <Cpu className="h-3.5 w-3.5 text-blue-500" />
+                  Gemini Incident Diagnostics
+                </h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground font-semibold">Confidence:</span>
+                  <Badge className={incident.aiConfidenceScore && incident.aiConfidenceScore > 0.7 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
+                    {incident.aiConfidenceScore ? `${Math.round(incident.aiConfidenceScore * 100)}%` : "N/A"}
+                  </Badge>
+                </div>
+              </div>
+              <div className="grid gap-3 text-xs">
+                <div>
+                  <span className="font-bold text-muted-foreground block uppercase text-[9px] tracking-wider mb-1">Executive Summary</span>
+                  <p className="text-foreground leading-relaxed font-medium">{incident.aiSummary}</p>
+                </div>
+                {incident.aiLikelyCause && (
+                  <div>
+                    <span className="font-bold text-muted-foreground block uppercase text-[9px] tracking-wider mb-1">Likely Root Cause</span>
+                    <p className="text-foreground font-semibold text-xs">{incident.aiLikelyCause}</p>
+                  </div>
+                )}
+                {incident.aiRecommendedActions && (
+                  <div>
+                    <span className="font-bold text-muted-foreground block uppercase text-[9px] tracking-wider mb-1">Recommended Remediation Path</span>
+                    <ul className="list-disc pl-4 text-foreground space-y-1 font-medium leading-relaxed">
+                      {incident.aiRecommendedActions.split(",").map((action, i) => (
+                        <li key={i}>{action.trim()}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
 }
 
 const settingsSchema = z.object({
@@ -454,25 +542,7 @@ export default function MonitorDetailsPage({ params }: PageProps) {
                     </TableHeader>
                     <TableBody>
                       {incidents.map((incident: Incident) => (
-                        <TableRow key={incident.id} className="border-border hover:bg-muted/50 transition-colors">
-                          <TableCell className="font-semibold text-foreground">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-sm font-bold text-foreground">{incident.title}</span>
-                              <span className="text-xs text-muted-foreground font-medium">{incident.description}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={incident.status === "RESOLVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25" : "bg-destructive/10 text-destructive border-destructive/25"}>
-                              {incident.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
-                            {new Date(incident.startedAt).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
-                            {incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString() : <span className="text-destructive font-bold animate-pulse">Active</span>}
-                          </TableCell>
-                        </TableRow>
+                        <IncidentRow key={incident.id} incident={incident} />
                       ))}
                     </TableBody>
                   </Table>

@@ -10,9 +10,18 @@ export async function GET(req: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  const url = new URL(req.url);
+  const triggerWeekly = url.searchParams.get("report") === "weekly";
+
   try {
-    await SchedulerService.runActiveChecks();
-    return NextResponse.json({ success: true, message: "Uptime checks executed." });
+    if (triggerWeekly) {
+      const { WeeklyReportService } = await import("@/services/weekly-report");
+      await WeeklyReportService.generateAndSendReports();
+      return NextResponse.json({ success: true, message: "Weekly infrastructure reports compiled and dispatched." });
+    } else {
+      await SchedulerService.runActiveChecks();
+      return NextResponse.json({ success: true, message: "Uptime checks executed." });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     logger.error(`Cron trigger execution failure: ${message}`);

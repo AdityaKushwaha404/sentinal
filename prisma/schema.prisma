@@ -24,16 +24,18 @@ enum NotificationType {
 }
 
 model User {
-  id            String         @id // Matches Clerk User ID
-  email         String         @unique
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                String             @id // Matches Clerk User ID
+  email             String             @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   
   // Relations
-  settings      UserSettings?
-  monitors      Monitor[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
+  settings          UserSettings?
+  monitors          Monitor[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  weeklyReports     WeeklyReport[]
+  assistantSessions AssistantSession[]
 
   @@index([email])
 }
@@ -127,7 +129,65 @@ model Incident {
   startedAt   DateTime       @default(now())
   resolvedAt  DateTime?
 
+  // AI Summary Enhancements
+  aiSummary            String?
+  aiLikelyCause        String?
+  aiRecommendedActions String? // Stored as comma-separated or text block
+  aiConfidenceScore    Float?
+  aiGeneratedAt        DateTime?
+
   @@index([monitorId, startedAt])
+}
+
+model WeeklyReport {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate          DateTime
+  endDate            DateTime
+  uptimeRatio        Float
+  totalIncidents     Int
+  averageLatency     Float
+  fastestMonitorName String
+  slowestMonitorName String
+  unstableMonitorName String
+  reliableMonitorName String
+  downtimeDurationMs  BigInt
+  sslExpiringCount   Int
+
+  // AI-generated markdown summary fields
+  aiExecutiveSummary String?
+  aiHealthAnalysis   String?
+  aiKeyFindings      String?
+  aiRiskAnalysis     String?
+  aiRecommendations  String?
+  aiPriorityActions  String?
+  createdAt          DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AssistantSession {
+  id        String             @id @default(uuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  messages  AssistantMessage[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userId])
+}
+
+model AssistantMessage {
+  id        String           @id @default(uuid())
+  sessionId String
+  session   AssistantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String           // "user" | "model"
+  content   String
+  createdAt DateTime         @default(now())
+
+  @@index([sessionId])
 }
 
 model AuditLog {

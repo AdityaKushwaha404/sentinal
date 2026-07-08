@@ -19,6 +19,7 @@ export default function DashboardLayout({
   const navItems = [
     { href: "/dashboard", label: "Monitors", icon: LayoutDashboard, color: "text-emerald-500", disabled: false },
     { href: "/dashboard/quick-check", label: "Quick Check", icon: Zap, color: "text-amber-500", disabled: false },
+    { href: "/dashboard/assistant", label: "AI Assistant", icon: Activity, color: "text-blue-500", disabled: false },
     { href: "#", label: "Audit Logs", icon: FileText, color: "text-muted-foreground", disabled: true },
     { href: "#", label: "Settings", icon: Settings, color: "text-muted-foreground", disabled: true },
   ];

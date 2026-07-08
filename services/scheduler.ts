@@ -3,6 +3,7 @@ import { checkHttp, checkTcp, checkSsl, checkJsonApi, checkPing, getHostname } f
 import { EmailService } from "./emails";
 import { logger } from "@/lib/logger";
 import { Prisma } from "@prisma/client";
+import { env } from "@/config/env";
 
 type MonitorWithUser = Prisma.MonitorGetPayload<{
   include: {
@@ -191,7 +192,7 @@ export class SchedulerService {
       });
 
       if (!openIncident) {
-        await db.incident.create({
+        const createdIncident = await db.incident.create({
           data: {
             monitorId: monitor.id,
             status: "OPEN",
@@ -202,9 +203,91 @@ export class SchedulerService {
         });
 
         const userEmail = monitor.user?.email || monitor.user?.id;
-        if (userEmail && monitor.user?.settings?.emailNotifications) {
-          await EmailService.sendAlert(userEmail, monitor.name, monitor.url, description);
-        }
+        
+        // Asynchronously process Gemini AI summary and email dispatch to keep prober cycle non-blocking
+        (async () => {
+          try {
+            let aiSummaryData: {
+              summary: string;
+              likelyCause: string;
+              actions: string;
+              confidence: number;
+            } | undefined = undefined;
+
+            if (env.ENABLE_AI) {
+              // 1. Gather context details
+              const [recentChecks, recentIncidents] = await Promise.all([
+                db.monitorCheck.findMany({
+                  where: { monitorId: monitor.id },
+                  orderBy: { checkedAt: "desc" },
+                  take: 5,
+                }),
+                db.incident.findMany({
+                  where: { monitorId: monitor.id },
+                  orderBy: { startedAt: "desc" },
+                  take: 3,
+                }),
+              ]);
+
+              const sslInfo = await db.sSLCertificate.findUnique({
+                where: { monitorId: monitor.id },
+              });
+
+              const latencyTrendStr = recentChecks.map(c => `${c.responseTime}ms (code ${c.statusCode || "N/A"})`).join(", ");
+              const incidentHistoryStr = recentIncidents.map(i => `${i.title} (${i.status})`).join(", ");
+
+              const { AiIncidentService } = await import("@/services/ai/incident");
+              const aiAnalysis = await AiIncidentService.generateSummary({
+                monitorName: monitor.name,
+                monitorType: monitorType,
+                targetUrl: monitor.url,
+                currentStatus: "DOWN",
+                previousStatus: String(previousStatus),
+                responseTime,
+                responseCode: String(statusCode || "N/A"),
+                failureReason: description,
+                sslStatus: sslInfo ? `${sslInfo.status} (Exp: ${sslInfo.expiryDate})` : "N/A",
+                recentLatencyTrend: latencyTrendStr || "No recent check history",
+                recentIncidentHistory: incidentHistoryStr || "No recent incident history",
+              });
+
+              if (aiAnalysis) {
+                // Update incident record in database
+                await db.incident.update({
+                  where: { id: createdIncident.id },
+                  data: {
+                    aiSummary: aiAnalysis.summary,
+                    aiLikelyCause: aiAnalysis.likelyCauses.join(", "),
+                    aiRecommendedActions: aiAnalysis.recommendedActions.join(", "),
+                    aiConfidenceScore: aiAnalysis.confidence,
+                    aiGeneratedAt: new Date(),
+                  },
+                });
+
+                aiSummaryData = {
+                  summary: aiAnalysis.summary,
+                  likelyCause: aiAnalysis.likelyCauses.join(", "),
+                  actions: aiAnalysis.recommendedActions.join(", "),
+                  confidence: aiAnalysis.confidence,
+                };
+              }
+            }
+
+            if (userEmail && monitor.user?.settings?.emailNotifications) {
+              await EmailService.sendAlert(userEmail, monitor.name, monitor.url, description, aiSummaryData);
+            }
+          } catch (aiErr) {
+            logger.error("AI Incident Summary background processing crashed:", aiErr);
+            // Fallback to standard email alert if AI processing crashes or fails
+            if (userEmail && monitor.user?.settings?.emailNotifications) {
+              try {
+                await EmailService.sendAlert(userEmail, monitor.name, monitor.url, description);
+              } catch (emailErr) {
+                logger.error("Standard fallback email dispatch failed:", emailErr);
+              }
+            }
+          }
+        })();
 
         // Create in-app notification
         await db.notification.create({
