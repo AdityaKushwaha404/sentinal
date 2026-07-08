@@ -253,6 +253,7 @@ ${expiringSsl.length > 0 ? `SSL Alert: ${expiringSsl.length} SSL certificate${ex
 
   } catch (err) {
     logger.error("Send summary route error:", err);
-    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+    const errMsg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+    return NextResponse.json({ error: "Internal server error.", details: errMsg }, { status: 500 });
   }
 }
