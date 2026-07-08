@@ -5,6 +5,7 @@ import { getGeminiClient } from "@/lib/gemini";
 import { EmailService } from "@/services/emails";
 import { logger } from "@/lib/logger";
 import { Resend } from "resend";
+import { env } from "@/config/env";
 
 export async function POST() {
   // Debug log – confirms the route was hit
@@ -228,10 +229,14 @@ ${expiringSsl.length > 0 ? `SSL Alert: ${expiringSsl.length} SSL certificate${ex
 
     // ── 6. Send via Resend ───────────────────────────────────────
     console.log('🔔 Preparing to send email via Resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    if (!env.RESEND_API_KEY) {
+      logger.error("RESEND_API_KEY is missing in env configuration.");
+      return NextResponse.json({ error: "Email configuration is missing on server." }, { status: 500 });
+    }
+    const resend = new Resend(env.RESEND_API_KEY);
 
     const sendResult = await resend.emails.send({
-      from: `Sentinel Alerts <${process.env.EMAIL_FROM_ADDRESS || "onboarding@resend.dev"}>`,
+      from: `Sentinel Alerts <${env.EMAIL_FROM_ADDRESS || "onboarding@resend.dev"}>`,
       to: user.email,
       subject: `[SUMMARY] Infrastructure Health — ${statusLabel} · ${now.toLocaleDateString()}`,
       html,
@@ -253,7 +258,6 @@ ${expiringSsl.length > 0 ? `SSL Alert: ${expiringSsl.length} SSL certificate${ex
 
   } catch (err) {
     logger.error("Send summary route error:", err);
-    const errMsg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
-    return NextResponse.json({ error: "Internal server error.", details: errMsg }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
