@@ -6,7 +6,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1, "Clerk Publishable Key is required"),
   CLERK_SECRET_KEY: z.string().min(1, "Clerk Secret Key is required"),
   CLERK_WEBHOOK_SECRET: z.string().optional().or(z.literal("")),
-  CRON_SECRET: z.string().min(1, "CRON_SECRET is required"),
+  CRON_SECRET: z.string().optional().or(z.literal("")),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
   RESEND_API_KEY: z.string().optional().or(z.literal("")),
   EMAIL_FROM_ADDRESS: z.string().email().default("alerts@sentinel.local"),
