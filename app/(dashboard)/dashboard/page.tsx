@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 
 
-import { Plus, Search, Loader2, Play, Pause, Trash2, Edit, ExternalLink, Activity, ShieldAlert, Wifi, Database, Cpu, Globe, Shield } from "lucide-react";
+import { Plus, Search, Loader2, Play, Pause, Trash2, Edit, ExternalLink, Activity, ShieldAlert, Wifi, Database, Cpu, Globe, Shield, Mail, CheckCircle2, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -57,6 +57,32 @@ export default function DashboardPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedMonitor, setSelectedMonitor] = useState<Monitor | null>(null);
+
+  // Send summary state
+  const [summaryState, setSummaryState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [summaryMsg, setSummaryMsg] = useState("");
+
+  const handleSendSummary = async () => {
+    if (summaryState === "loading") return;
+    setSummaryState("loading");
+    setSummaryMsg("");
+    try {
+      const res = await fetch("/api/user/send-summary", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setSummaryState("success");
+        setSummaryMsg(`Sent to ${data.sentTo}`);
+      } else {
+        setSummaryState("error");
+        setSummaryMsg(data.error || "Failed to send.");
+      }
+    } catch {
+      setSummaryState("error");
+      setSummaryMsg("Network error. Try again.");
+    } finally {
+      setTimeout(() => { setSummaryState("idle"); setSummaryMsg(""); }, 4000);
+    }
+  };
 
   // React Query hooks
   const { data: metrics } = useDashboardMetrics();
@@ -167,13 +193,49 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <button 
-          onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all shadow-sm self-start sm:self-center font-sans border-0"
-        >
-          <Plus className="h-4 w-4" />
-          Add Monitor Target
-        </button>
+        <div className="flex items-center gap-3 self-start sm:self-center flex-wrap">
+          {/* Send Summary Email button */}
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleSendSummary}
+              disabled={summaryState === "loading"}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold cursor-pointer transition-all shadow-sm border font-sans ${
+                summaryState === "success"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                  : summaryState === "error"
+                  ? "bg-destructive/10 border-destructive/30 text-destructive"
+                  : "bg-card border-border text-foreground hover:bg-accent"
+              } disabled:opacity-60`}
+            >
+              {summaryState === "loading" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : summaryState === "success" ? (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              ) : summaryState === "error" ? (
+                <AlertCircle className="h-3.5 w-3.5" />
+              ) : (
+                <Mail className="h-3.5 w-3.5" />
+              )}
+              {summaryState === "loading" ? "Generating..." : summaryState === "success" ? "Email Sent!" : summaryState === "error" ? "Failed" : "Send Summary Email"}
+            </button>
+            {summaryMsg && (
+              <span className={`text-[10px] font-medium ${
+                summaryState === "success" ? "text-emerald-500" : "text-destructive"
+              }`}>
+                {summaryMsg}
+              </span>
+            )}
+          </div>
+
+          {/* Add monitor button */}
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all shadow-sm font-sans border-0"
+          >
+            <Plus className="h-4 w-4" />
+            Add Monitor Target
+          </button>
+        </div>
 
         <MonitorWizard isOpen={isAddOpen} onOpenChange={setIsAddOpen} />
       </div>

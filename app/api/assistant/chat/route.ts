@@ -287,6 +287,9 @@ export async function POST(req: Request) {
     return NextResponse.json(responseMessage);
   } catch (error) {
     logger.error("Failed to query AI Assistant:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 }
+    );
   }
 }

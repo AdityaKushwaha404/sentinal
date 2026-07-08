@@ -26,8 +26,15 @@ function isRetryableError(error: unknown): boolean {
     msg.includes("unavailable") ||
     msg.includes("overloaded") ||
     msg.includes("rate limit") ||
-    msg.includes("too many requests")
+    msg.includes("too many requests") ||
+    msg.includes("model output must contain") ||
+    msg.includes("output text or tool calls")
   );
+}
+
+function isEmptyOutputError(error: unknown): boolean {
+  const msg = String((error as Record<string, unknown>)?.message || "").toLowerCase();
+  return msg.includes("model output must contain") || msg.includes("output text or tool calls");
 }
 
 export class AiAssistantService {
@@ -90,6 +97,10 @@ export class AiAssistantService {
     }
 
     // Provide a clean, user-friendly error — never expose raw JSON
+    if (isEmptyOutputError(lastError)) {
+      return "I wasn't able to generate a response for that query. This sometimes happens with complex or ambiguous prompts. Please try rephrasing your question.";
+    }
+
     if (isRetryableError(lastError)) {
       return "I'm experiencing high demand right now and couldn't process your request. Please try again in a few seconds — this is usually temporary.";
     }
