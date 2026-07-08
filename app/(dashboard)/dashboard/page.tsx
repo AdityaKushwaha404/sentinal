@@ -63,12 +63,16 @@ export default function DashboardPage() {
   const [summaryMsg, setSummaryMsg] = useState("");
 
   const handleSendSummary = async () => {
+  console.log('🔔 handleSendSummary invoked');
     if (summaryState === "loading") return;
     setSummaryState("loading");
     setSummaryMsg("");
+    console.log('🔔 Sending POST to /api/user/send-summary');
     try {
       const res = await fetch("/api/user/send-summary", { method: "POST" });
+      console.log('🔔 Received response, status:', res.status);
       const data = await res.json();
+      console.log('🔔 Response body:', data);
       if (res.ok) {
         setSummaryState("success");
         setSummaryMsg(`Sent to ${data.sentTo}`);
@@ -76,11 +80,15 @@ export default function DashboardPage() {
         setSummaryState("error");
         setSummaryMsg(data.error || "Failed to send.");
       }
-    } catch {
+    } catch (err) {
+      console.error('🔔 Fetch error:', err);
       setSummaryState("error");
       setSummaryMsg("Network error. Try again.");
     } finally {
-      setTimeout(() => { setSummaryState("idle"); setSummaryMsg(""); }, 4000);
+      setTimeout(() => {
+        setSummaryState("idle");
+        setSummaryMsg("");
+      }, 4000);
     }
   };
 

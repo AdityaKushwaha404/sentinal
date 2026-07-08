@@ -6,8 +6,19 @@ import { EmailService } from "@/services/emails";
 import { logger } from "@/lib/logger";
 
 export async function POST() {
+  // Debug log – confirms the route was hit
+  console.log('🔔 send-summary route invoked');
+  // Verify user authentication
   const user = await getOrCreateCurrentUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
+
+  // Basic sanity checks
+  if (!user.email) {
+    logger.error("User email missing for send-summary");
+    return NextResponse.json({ error: "User email not configured." }, { status: 400 });
+  }
+  logger.info(`Attempting to send summary email to ${user.email}`);
+  logger.info(`RESEND_API_KEY length: ${process.env.RESEND_API_KEY?.length || 0}`);
 
   try {
     const now = new Date();
@@ -215,20 +226,34 @@ ${expiringSsl.length > 0 ? `SSL Alert: ${expiringSsl.length} SSL certificate${ex
 </html>`;
 
     // ── 6. Send via Resend ───────────────────────────────────────
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('🔔 Preparing to send email via Resend');
+    let resend;
+    try {
+      const { Resend } = await import("resend");
+      resend = new Resend(process.env.RESEND_API_KEY);
+    } catch (importErr) {
+      logger.error("Failed to import Resend SDK:", importErr);
+      console.error('🔔 Resend import error', importErr);
+      return NextResponse.json({ error: "Email service unavailable." }, { status: 500 });
+    }
 
-    const { error } = await resend.emails.send({
+    const sendResult = await resend.emails.send({
       from: `Sentinel Alerts <${process.env.EMAIL_FROM_ADDRESS || "onboarding@resend.dev"}>`,
       to: user.email,
       subject: `[SUMMARY] Infrastructure Health — ${statusLabel} · ${now.toLocaleDateString()}`,
       html,
     });
+    console.log('🔔 Resend sendResult:', sendResult);
 
-    if (error) {
-      logger.error("Resend send-summary error:", error);
-      return NextResponse.json({ error: "Failed to send email. Check Resend configuration." }, { status: 500 });
+    if (sendResult.error) {
+      logger.error("Resend send-summary error:", sendResult.error);
+      console.error('🔔 Resend send error', sendResult.error);
+      const errMsg = typeof sendResult.error === "object" && sendResult.error?.message ? sendResult.error.message : "Unknown error";
+      return NextResponse.json({ error: `Failed to send email: ${errMsg}` }, { status: 500 });
     }
+    logger.info(`Email successfully sent via Resend to ${user.email}`);
+    console.log('🔔 Email sent successfully');
+
 
     logger.info(`On-demand summary email sent to ${user.email}`);
     return NextResponse.json({ success: true, sentTo: user.email });
